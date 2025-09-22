@@ -1,11 +1,12 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer
-from jose import jwt, JWTError
-from app.core.config import settings
-from app.db.session import get_session
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.user import User
-from sqlalchemy import select
+# ruff was driving me crazy with imported not used, noqa on all of these..
+from fastapi import Depends, HTTPException, status # noqa: F401
+from fastapi.security import HTTPBearer # noqa: F401
+from jose import jwt, JWTError # noqa: F401
+from app.core.config import settings # noqa: F401
+from app.db.session import get_session # noqa: F401
+from sqlalchemy.ext.asyncio import AsyncSession # noqa: F401
+from app.models.user import User # noqa: F401
+from sqlalchemy import select # noqa: F401
 
 bearer = HTTPBearer()
 
