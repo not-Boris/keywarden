@@ -1,9 +1,11 @@
-import asyncio
+import sys, pathlib
+
+# Add project root (parent of the "alembic" dir) to sys.path
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from logging.config import fileConfig
-
-from sqlalchemy import pool
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-
 from alembic import context
 
 # Import your app's config & models
