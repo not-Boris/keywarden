@@ -12,19 +12,19 @@ A lightweight, self-hosted (Work-in-progress!) SSH key management and access aud
 Keywarden is a web-based service designed to simplify secure access to Linux servers. It provides a central place to manage SSH keys, enforce access policies, and monitor login activity — making it easier for sysadmins, homelabbers, and small teams to deploy access security without enterprise overhead.
 
 ✨ (TBC) Features
-	•	User & Key Management – Upload, register, and manage SSH public keys with enforced algorithms and expiry policies.
-	•	Access Requests & Approvals – Users can request server access, with administrators able to approve/deny via a web dashboard.
-	•	Automated Key Deployment – Lightweight agent synchronises authorized_keys files on target servers in real time.
-	•	Access Auditing – Centralised logs of who accessed what, including successful and failed login attempts.
-	•	Dashboards & Reports – Visualise login activity and export compliance reports.
-	•	Lightweight & Self-hosted – Built with FastAPI, PostgreSQL, and Docker; easy to run in a homelab or small team environment.
+	- User & Key Management – Upload, register, and manage SSH public keys with enforced algorithms and expiry policies.
+	- Access Requests & Approvals – Users can request server access, with administrators able to approve/deny via a web dashboard.
+	- Automated Key Deployment – Lightweight agent synchronises authorized_keys files on target servers in real time.
+	- Access Auditing – Centralised logs of who accessed what, including successful and failed login attempts.
+	- Dashboards & Reports – Visualise login activity and export compliance reports.
+	- Lightweight & Self-hosted – Built with FastAPI, PostgreSQL, and Docker; easy to run in a homelab or small team environment.
 
 🚀 Tech Stack
-	•	Backend: FastAPI (Python), SQLAlchemy
-	•	Database: PostgreSQL
-	•	Frontend: React (planned), Tailwind, served via Nginx
-	•	Agent: Python/Go (lightweight daemon for servers)
-	•	Deployment: Docker & Docker Compose
+	- Backend: FastAPI (Python), SQLAlchemy
+	- Database: PostgreSQL
+	- Frontend: React (planned), Tailwind, served via Nginx
+	- Agent: Python/Go (lightweight daemon for servers)
+	- Deployment: Docker & Docker Compose
 
 📚 Motivation
 
