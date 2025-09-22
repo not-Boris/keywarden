@@ -4,10 +4,10 @@ A lightweight, self-hosted (Work-in-progress!) SSH key management and access aud
 
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)  
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.114%2B-009688?logo=fastapi)  
-![Postgres](https://img.shields.io/badge/Postgres-16-336791?logo=postgresql)  
+![Postgres](https://img.shields.io/badge/Postgres-17-336791?logo=postgresql)  
 ![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker)  
-![License](https://img.shields.io/badge/license-MIT-green)  
-![Build](https://img.shields.io/github/actions/workflow/status/**yourusername**/keywarden/ci.yml?branch=main&label=build&logo=github)  
+![License](https://img.shields.io/badge/license-AGPL3.0-green)  
+![Build](https://img.shields.io/github/actions/workflow/status/not-Boris/keywarden/ci.yml?branch=main&label=build&logo=github)  
 
 Keywarden is a web-based service designed to simplify secure access to Linux servers. It provides a central place to manage SSH keys, enforce access policies, and monitor login activity — making it easier for sysadmins, homelabbers, and small teams to deploy access security without enterprise overhead.
 
