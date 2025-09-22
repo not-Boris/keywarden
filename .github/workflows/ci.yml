@@ -77,20 +77,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       
-      - name: Create .env for tests
-        run: |
-          printf "KEYWARDEN_POSTGRES_DSN=%s\nKEYWARDEN_SECRET_KEY=%s\nKEYWARDEN_ACCESS_TOKEN_EXPIRE_MINUTES=60\n" \
-            "${{ env.TEST_POSTGRES_DSN }}" "testsecret" > .env
-          echo "Wrote .env with DSN=${{ env.TEST_POSTGRES_DSN }}"
-      
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=${GITHUB_WORKSPACE}" >> $GITHUB_ENV
+
+      - name: Create .env for tests (optional for app runtime)
+        run: |
+          printf "KEYWARDEN_POSTGRES_DSN=%s\nKEYWARDEN_SECRET_KEY=%s\n" \
+            "${{ env.TEST_POSTGRES_DSN }}" "testsecret" > .env
 
       - name: Run Alembic migrations
         env:
           KEYWARDEN_POSTGRES_DSN: ${{ env.TEST_POSTGRES_DSN }}
-        run: |
-          alembic upgrade head
+        run: alembic upgrade head
+  
       - name: Pytest
         env:
           KEYWARDEN_POSTGRES_DSN: ${{ env.TEST_POSTGRES_DSN }}
