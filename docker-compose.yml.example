@@ -1,0 +1,45 @@
+services:
+  nginx:
+    container_name: nginx
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ${DOCKERDIR}/nginx/configs/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${DOCKERDIR}/nginx/configs/sites:/etc/nginx/conf.d/
+      - ${DOCKERDIR}/nginx/certs/:/certs/
+      - ${DOCKERDIR}/nginx/webdir/:/var/www/
+      - ${DOCKERDIR}/nginx/logs:/var/log/nginx/
+    ports:
+      - "443:443"
+
+  nginx-valkey:
+    image: valkey/valkey:latest
+    restart: unless-stopped
+    container_name: nginx-valkey
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: keywarden
+      POSTGRES_USER: postgres
+    # ports: ["5432:5432"]
+    volumes: 
+      - "pgdata:/var/lib/postgresql/data"
+
+  api:
+    build: .
+    depends_on:
+      - db
+    environment:
+      - SECRET_KEY=[CREATE SECRET KEY]
+      - POSTGRES_DSN=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@keywarden-postgres:5432/keywarden
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+    ports: 
+      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+volumes:
+  pgdata:
