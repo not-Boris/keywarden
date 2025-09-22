@@ -10,4 +10,4 @@ app.include_router(keys.router, prefix=f"{settings.API_V1_STR}/keys", tags=["key
 # Health endpoint (useful for docker, agent and uptime)
 @app.get("/healthz")
 def healthz():
-    return {"status": 'ok'}
+    return {"ok": True}
