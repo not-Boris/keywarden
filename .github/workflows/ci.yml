@@ -94,7 +94,7 @@ jobs:
         env:
           KEYWARDEN_POSTGRES_DSN: ${{ env.TEST_POSTGRES_DSN }}
         run: |
-          pytest -q
+          pytest -q tests
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest
