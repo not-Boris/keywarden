@@ -15,7 +15,7 @@ env:
   TEST_POSTGRES_DSN: postgresql+asyncpg://postgres:postgres@localhost:5432/keywarden
 
 jobs:
- lint:
+  lint:
    name: Lint & Format
    runs-on: ubuntu-latest
    steps:
