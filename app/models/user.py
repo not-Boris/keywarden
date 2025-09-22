@@ -1,7 +1,9 @@
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import String, Boolean
-from app.db.session import engine  # only for Alembic discovery, not used here
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import Boolean, String
+from sqlalchemy.orm import Mapped, declarative_base, mapped_column
+
+# only for Alembic discovery, not used here
+from app.db.session import engine  # noqa: F401
+
 Base = declarative_base()
 
 class User(Base):

@@ -1,12 +1,13 @@
-import os
-import sys
-import pathlib
 import asyncio
+import os
+import pathlib
+import sys
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+
+from alembic import context
 
 # Ensure project root is importable
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -14,7 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 # Import metadata (should NOT import settings)
-from app.db.base import Base  # Base.metadata must include all models
+from app.db.base import Base  # Base.metadata must include all models  # noqa: E402
 
 # Alembic config & logging
 config = context.config

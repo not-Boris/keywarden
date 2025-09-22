@@ -1,7 +1,10 @@
-from sqlalchemy import ForeignKey, String, DateTime
+from datetime import datetime, timezone #noqa
+
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
-from datetime import datetime, timezone
+
 from app.models.user import Base
+
 
 class AccessRequest(Base):
     __tablename__ = "access_requests"

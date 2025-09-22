@@ -1,7 +1,10 @@
-from sqlalchemy import ForeignKey, String, DateTime, Boolean
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from datetime import datetime, timezone
+from datetime import datetime, timezone  # noqa: F401
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship  # noqa: F401
+
 from app.models.user import Base
+
 
 class SSHKey(Base):
     __tablename__ = "ssh_keys"

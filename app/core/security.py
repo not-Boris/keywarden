@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
+
 from jose import jwt
 from passlib.hash import argon2
+
 from app.core.config import settings
 
 ALGO = "HS256"
