@@ -1,7 +1,7 @@
 from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base_class import Base  # <-- use the shared Base
+from app.db.base_class import Base
 
 
 class User(Base):

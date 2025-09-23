@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.user import Base
+from app.db.base_class import Base
 
 
 class AuditEvent(Base):

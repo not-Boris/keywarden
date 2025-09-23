@@ -1,9 +1,9 @@
 from datetime import datetime, timezone  # noqa: F401
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship  # noqa: F401
+from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.user import Base
+from app.db.base_class import Base
 
 
 class SSHKey(Base):
