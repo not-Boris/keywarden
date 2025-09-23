@@ -27,9 +27,11 @@ Keywarden is a web-based service designed to simplify secure access to Linux ser
 - Deployment: Docker & Docker Compose
 
 📚 Motivation
+
 SSH is the backbone of secure remote administration, but poor key lifecycle management and lack of auditing create major risks. Enterprise tools like Teleport exist, but are often heavy and complex. Keywarden fills the gap by providing a focused, lightweight, and educational tool for secure SSH access control.
 
 🛠️ Getting Started
+
 There are currently no built artefacts for Keywarden as of 22/09/2025.
 ```bash
 # clone the repository
