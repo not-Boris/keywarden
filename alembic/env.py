@@ -27,7 +27,7 @@ target_metadata = Base.metadata
 # Get DB URL from env (prefer KEYWARDEN_ prefix, fall back to unprefixed, then a sane default for local)
 DB_USER = os.getenv("KEYWARDEN_POSTGRES_USER", "postgres")
 DB_PASS = os.getenv("KEYWARDEN_POSTGRES_PASSWORD", "postgres")
-DB_HOST = os.getenv("KEYWARDEN_POSTGRES_HOST", "localhost")
+DB_HOST = os.getenv("KEYWARDEN_POSTGRES_HOST", "keywarden-db")
 DB_PORT = os.getenv("KEYWARDEN_POSTGRES_PORT", "5432")
 DB_NAME = os.getenv("KEYWARDEN_POSTGRES_DB", "keywarden")
 

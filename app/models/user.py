@@ -1,10 +1,8 @@
 from sqlalchemy import Boolean, String
-from sqlalchemy.orm import Mapped, declarative_base, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
 
-# only for Alembic discovery, not used here
-from app.db.session import engine  # noqa: F401
+from app.db.base_class import Base  # <-- use the shared Base
 
-Base = declarative_base()
 
 class User(Base):
     __tablename__ = "users"
