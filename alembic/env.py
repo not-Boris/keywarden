@@ -25,11 +25,13 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Get DB URL from env (prefer KEYWARDEN_ prefix, fall back to unprefixed, then a sane default for local)
-DB_URL = (
-    os.getenv("KEYWARDEN_POSTGRES_DSN")
-    or os.getenv("POSTGRES_DSN")
-    or "postgresql+asyncpg://postgres:postgres@localhost:5432/keywarden"
-)
+DB_USER = os.getenv("KEYWARDEN_POSTGRES_USER", "postgres")
+DB_PASS = os.getenv("KEYWARDEN_POSTGRES_PASSWORD", "postgres")
+DB_HOST = os.getenv("KEYWARDEN_POSTGRES_HOST", "localhost")
+DB_PORT = os.getenv("KEYWARDEN_POSTGRES_PORT", "5432")
+DB_NAME = os.getenv("KEYWARDEN_POSTGRES_DB", "keywarden")
+
+DB_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 
 def run_migrations_offline():

@@ -9,6 +9,7 @@ services:
       - ${DOCKERDIR}/nginx/certs/:/certs/
       - ${DOCKERDIR}/nginx/webdir/:/var/www/
       - ${DOCKERDIR}/nginx/logs:/var/log/nginx/
+# - "external:internal", change external to desired port
     ports:
       - "443:443"
 
@@ -22,10 +23,13 @@ services:
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: keywarden
-      POSTGRES_USER: postgres
-    # ports: ["5432:5432"]
+      POSTGRES_PASSWORD: ${KEYWARDEN_POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${KEYWARDEN_POSTGRES_DB:-keywarden}
+      POSTGRES_USER: ${KEYWARDEN_POSTGRES_USER:-keywarden}
+      POSTGRES_PORT: ${KEYWARDEN_POSTGRES_PORT:-5432}
+# Do not enable unless debugging, not needed to be exposed outside of docker network
+#    ports: 
+#      - "5432:5432"
     volumes: 
       - "pgdata:/var/lib/postgresql/data"
 
@@ -33,12 +37,11 @@ services:
     build: .
     depends_on:
       - db
-    environment:
-      - SECRET_KEY=[CREATE SECRET KEY]
-      - POSTGRES_DSN=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@keywarden-postgres:5432/keywarden
-      - ACCESS_TOKEN_EXPIRE_MINUTES=60
-    ports: 
-      - "8000:8000"
+    env_file:
+      - .env
+# API runs on port 8000, but is unneeded to be external unless using a custom reverse proxy on another machine
+#    ports: 
+#      - "8000:8000"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 volumes:

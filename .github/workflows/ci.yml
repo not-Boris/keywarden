@@ -11,9 +11,12 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.11"
-  # Used by tests / alembic; matches docker-compose-style DSN
-  TEST_POSTGRES_DSN: postgresql+asyncpg://postgres:postgres@localhost:5432/keywarden
-
+  # Used by tests / alembic; matches docker compose environment
+  KEYWARDEN_POSTGRES_USER: postgres
+  KEYWARDEN_POSTGRES_PASSWORD: postgres
+  KEYWARDEN_POSTGRES_HOST: localhost
+  KEYWARDEN_POSTGRES_PORT: 5432
+  KEYWARDEN_POSTGRES_DB: keywarden
 jobs:
   lint:
    name: Lint & Format
