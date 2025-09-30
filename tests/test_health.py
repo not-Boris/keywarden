@@ -8,6 +8,6 @@ from app.main import app
 
 def test_healthz():
     client = TestClient(app)
-    r = client.get("/healthz")
+    r = client.get("/readyz")
     assert r.status_code == 200
-    assert r.json() == {"ok": True}
+    assert r.json() == {"status": "ok", "db": "up"}
