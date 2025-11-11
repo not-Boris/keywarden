@@ -1,7 +1,7 @@
 services:
   keywarden-nginx:
-    container_name: keywarden-nginx
     image: nginx:alpine
+    container_name: keywarden-nginx
     restart: unless-stopped
     volumes:
       - ${DOCKERDIR}/nginx/configs/nginx.conf:/etc/nginx/nginx.conf:ro
@@ -9,7 +9,6 @@ services:
       - ${DOCKERDIR}/nginx/certs/:/certs/
       - ${DOCKERDIR}/nginx/webdir/:/var/www/
       - ${DOCKERDIR}/nginx/logs:/var/log/nginx/
-# - "external:internal", change external to desired port
     ports:
       - "443:443"
 
@@ -21,16 +20,13 @@ services:
       - ALLOW_EMPTY_PASSWORD=yes
 
   keywarden-db:
-    container_name: keywarden-db
     image: postgres:17-alpine
+    container_name: keywarden-db
     environment:
       POSTGRES_PASSWORD: ${KEYWARDEN_POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${KEYWARDEN_POSTGRES_DB:-keywarden}
       POSTGRES_USER: ${KEYWARDEN_POSTGRES_USER:-keywarden}
       POSTGRES_PORT: ${KEYWARDEN_POSTGRES_PORT:-5432}
-# Do not enable unless debugging, not needed to be exposed outside of docker network
-#    ports: 
-#      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keywarden -d keywarden"]
       interval: 5s
@@ -40,13 +36,11 @@ services:
       - "pgdata:/var/lib/postgresql/data"
 
   keywarden:
-    build: .
+    image: git.ntbx.io/boris/keywarden:latest
     container_name: keywarden
     command: gunicorn keywarden.wsgi:application --bind 0.0.0.0:8000
-    volumes:
-      - .:/app
     ports:
-      - "8000:8000"
+      - "8000:80"
     depends_on:
       - keywarden-db
       - keywarden-valkey
@@ -55,18 +49,6 @@ services:
       - PYTHONPATH=/app
     env_file:
       - .env
-
-
-#  authentik:
-#    image: ghcr.io/goauthentik/server
-#    environment:
-#      AUTHENTIK_SECRET_KEY: supersecretkey
-#      AUTHENTIK_POSTGRESQL__HOST: db
-#      AUTHENTIK_POSTGRESQL__USER: django
-#      AUTHENTIK_POSTGRESQL__PASSWORD: django
-#      AUTHENTIK_POSTGRESQL__NAME: authentik
-#    ports:
-#      - "9000:9000"
 
 volumes:
   pgdata:
