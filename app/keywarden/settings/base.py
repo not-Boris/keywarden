@@ -2,6 +2,9 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
+
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -21,6 +24,8 @@ CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 
 INSTALLED_APPS = [
+    "unfold",               # Admin UI
+    "unfold.contrib.filters",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -31,8 +36,6 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.dashboard",
     "ninja",                # Django Ninja API
-    "unfold",               # Admin UI
-    "unfold.contrib.filters",
     "mozilla_django_oidc",   # OIDC Client
     "tailwind",
     "theme"
@@ -113,6 +116,8 @@ UNFOLD = {
     "LOGIN_REDIRECT_URL": "/admin/",
     "ENVIRONMENT": "Keywarden",
     "ENVIRONMENT_COLOR": "#7C3AED",
+    "SHOW_VIEW_ON_SITE": True,
+    "THEME": "dark", # Force theme: "dark" or "light". Will disable theme switcher
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": True,
@@ -138,6 +143,31 @@ UNFOLD = {
         "/static/unfold/js/simplebar.js",
         "/static/unfold/js/alpine.js",
     ],
+    "SITE_DROPDOWN": [
+        {
+            "icon": "diamond",
+            "title": _("Keywarden"),
+            "link": "https://keywarden.dev.ntbx.io",
+            "attrs": {
+                "target": "_blank",
+            },
+        },
+
+    ],
+    # "TABS": [
+    #     {
+    #         "models": [
+    #             "app_label.Accounts",
+    #         ],
+    #         "items": [
+    #             {
+    #                 "title": _("Accounts"),
+    #                 "link": reverse_lazy("admin:app_label_model_name_changelist"),
+    #                 "permission": "keywarden.settings.permission_callback",
+    #             },
+    #         ],
+    #     },
+    # ],    
 }
 
 OIDC_RP_CLIENT_ID = os.getenv("KEYWARDEN_OIDC_CLIENT_ID")
@@ -151,3 +181,6 @@ LOGIN_URL = "/oidc/authenticate/"
 LOGOUT_URL = "/oidc/logout/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
+
+def permission_callback(request):
+    return request.user.has_perm("keywarden.change_model")

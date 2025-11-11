@@ -22,6 +22,15 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     form = UserChangeForm
     add_form = UserCreationForm
     change_password_form = AdminPasswordChangeForm
+    
+    # Set to False, to enable filter as "sidebar"
+    list_filter_sheet = True
+
+    # Display fields in changeform in compressed mode
+    compressed_fields = True  # Default: False
+
+    # Warn before leaving unsaved changes in changeform
+    warn_unsaved_form = True  # Default: False
 
 
 @admin.register(Group)

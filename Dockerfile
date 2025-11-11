@@ -40,7 +40,7 @@ RUN pip install --upgrade pip \
 # 4. Collect static assets
 # =============================================
 WORKDIR /app
-COPY . .
+COPY ./app .
 
 RUN python manage.py collectstatic --noinput
 
