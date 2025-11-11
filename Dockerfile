@@ -43,6 +43,7 @@ WORKDIR /app
 COPY ./app .
 
 RUN python manage.py collectstatic --noinput
+RUN chmod +x /app/entrypoint.sh
 
 # =============================================
 # 5. Create non-root user
@@ -55,4 +56,4 @@ EXPOSE 80
 # =============================================
 # 6. Launch the app
 # =============================================
-CMD ["gunicorn", "keywarden.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+CMD ["./entrypoint.sh"]

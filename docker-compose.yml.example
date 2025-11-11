@@ -38,7 +38,7 @@ services:
   keywarden:
     image: git.ntbx.io/boris/keywarden:latest
     container_name: keywarden
-    command: gunicorn keywarden.wsgi:application --bind 0.0.0.0:8000
+    command: sh ./entrypoint.sh
     ports:
       - "8000:80"
     depends_on:
@@ -47,6 +47,9 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=keywarden.settings.dev
       - PYTHONPATH=/app
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
     env_file:
       - .env
 
