@@ -1,19 +1,37 @@
 from django.contrib import admin
-from django.contrib.auth.models import User
-from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+
 from unfold.admin import ModelAdmin
+from unfold.sections import TableSection, TemplateSection
 
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
-class UnfoldUserAdmin(DjangoUserAdmin, ModelAdmin):
-    list_display = DjangoUserAdmin.list_display + ("last_login", "date_joined")
-    readonly_fields = ("last_login", "date_joined")
-    ordering = ("-date_joined",)
+from .models import Account
 
+def __str__(self):
+    return f"{self.firstname} {self.lastname}"
 
-# Unregister the default User admin and register with Unfold
-try:
-    admin.site.unregister(User)
-except admin.sites.NotRegistered:
-    pass
+# # Register your models here.
+# admin.site.register(Account)
 
-admin.site.register(User, UnfoldUserAdmin)
+# Table for related records
+class CustomTableSection(TableSection):
+    verbose_name = _("Keywarden Users")  # Displays custom table title
+    height = 300  # Force the table height. Ideal for large amount of records
+    # related_name = "related_name_set"  # Related model field name
+    fields = ["id", "firstname", "lastname", "joined_date"]  # Fields from related model
+
+    # # Custom field
+    # def custom_field(self, instance):
+    #     return instance.pk
+
+# # Simple template with custom content
+# class CardSection(TemplateSection):
+#     template_name = "keywarden/some_template.html"
+
+@admin.register(Account)
+class SomeAdmin(ModelAdmin):
+    list_sections = [
+        #CardSection,
+        CustomTableSection,
+    ]

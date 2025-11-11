@@ -146,8 +146,16 @@ UNFOLD = {
     "SITE_DROPDOWN": [
         {
             "icon": "diamond",
-            "title": _("Keywarden"),
+            "title": _("Keywarden Development"),
             "link": "https://keywarden.dev.ntbx.io",
+            "attrs": {
+                "target": "_blank",
+            },
+        },
+        {
+            "icon": "diamond",
+            "title": _("Keywarden [Inactive]"),
+            "link": "https://keywarden.ntbx.io",
             "attrs": {
                 "target": "_blank",
             },
@@ -157,13 +165,13 @@ UNFOLD = {
     # "TABS": [
     #     {
     #         "models": [
-    #             "app_label.Accounts",
+    #             "keywarden.accounts",
     #         ],
     #         "items": [
     #             {
     #                 "title": _("Accounts"),
-    #                 "link": reverse_lazy("admin:app_label_model_name_changelist"),
-    #                 "permission": "keywarden.settings.permission_callback",
+    #                 "link": reverse_lazy("admin:accounts"),
+    #                 "permission": "keywarden.permission_callback",
     #             },
     #         ],
     #     },
