@@ -1,0 +1,45 @@
+{% load static tailwind_tags %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>{% block title %}Keywarden{% endblock %}</title>
+    {% tailwind_css %}
+  </head>
+  <body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
+    <div class="min-h-screen flex flex-col">
+    <header class="border-b border-gray-200 bg-white">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="flex h-16 items-center justify-between">
+          <a href="/" class="inline-flex items-center gap-2">
+            <span class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-purple-600 text-white font-semibold">K</span>
+            <span class="text-lg font-semibold tracking-tight">Keywarden</span>
+          </a>
+          <nav class="flex items-center gap-4">
+            {% if request.user.is_authenticated %}
+              <a href="{% url 'accounts:profile' %}" class="text-sm font-medium text-gray-700 hover:text-purple-700">Profile</a>
+              <a href="{% url 'accounts:logout' %}" class="inline-flex items-center rounded-md bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600">Logout</a>
+            {% else %}
+              <a href="{% url 'accounts:login' %}" class="inline-flex items-center rounded-md bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600">Login</a>
+            {% endif %}
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 flex-1 w-full">
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="border-t border-gray-200 bg-white">
+      <div class="mx-auto max-w-7xl px-4 py-6 text-sm text-gray-500 sm:px-6 lg:px-8">
+        <a class="underline text-blue-600 hover:text-blue-800 visited:text-purple-600" href="https://git.ntbx.io/boris/keywarden">Keywarden</a> | <a class="underline text-blue-600 hover:text-blue-800 visited:text-purple-600" href="https://ntbx.io">George Wilkinson</a> (2025)
+      </div>
+    </footer>
+    </div>
+  </body>
+  </html>
+
+

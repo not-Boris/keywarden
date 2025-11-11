@@ -1,0 +1,86 @@
+/* Keywarden dashboard styles - minimal and theme-aware, no resets */
+
+.kw-wrap {
+  max-width: 22rem; /* ~352px - sidebar-like width */
+  margin: 1.5rem auto 0; /* center + space above */
+  padding: 0 1rem; /* small side gutters */
+}
+
+.kw-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  color: rgba(255, 255, 255, 0.92);
+}
+html:not(.dark) .kw-card {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #111827; /* gray-900 */
+}
+
+.kw-card h3 {
+  margin: 0 0 .5rem;
+  font-weight: 600;
+  font-size: 1rem; /* 16px */
+}
+
+.kw-title {
+  margin: 0 0 .5rem;
+  font-weight: 600;
+  font-size: 1rem; /* 16px */
+}
+
+.kw-stack > * + * {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+html:not(.dark) .kw-stack > * + * {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+.kw-muted {
+  font-size: .875rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+html:not(.dark) .kw-muted {
+  color: #6b7280; /* gray-500 */
+}
+
+.kw-subtitle {
+  font-size: .875rem; /* 14px */
+  color: rgba(255, 255, 255, 0.78);
+}
+html:not(.dark) .kw-subtitle {
+  color: #374151; /* gray-700 */
+}
+
+.kw-count {
+  margin: .25rem 0;
+  font-size: 1.5rem; /* 24px */
+  font-weight: 600;
+}
+
+.kw-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: .3rem .6rem;
+  border-radius: 9999px;
+  font-size: .875rem; /* 14px */
+  line-height: 1.25rem; /* 20px */
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+html:not(.dark) .kw-pill {
+  background: rgba(0, 0, 0, 0.06);
+  color: #111827;
+}
+
+.kw-good { color: #86efac; }    /* green-300 */
+.kw-warn { color: #fdba74; }    /* orange-300 */
+.kw-bad  { color: #fca5a5; }    /* red-300 */
+
+

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Sign in • Keywarden{% endblock %}
+
+{% block content %}
+  <div class="mx-auto max-w-md">
+    <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
+      <h1 class="mb-6 text-xl font-semibold tracking-tight text-gray-900">Sign in</h1>
+      <form method="post" class="space-y-4">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{% url 'accounts:profile' %}">
+        <div class="space-y-1.5">
+          <label class="block text-sm font-medium text-gray-700">Username</label>
+          <input type="text" name="username" autocomplete="username" required class="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-600 focus:ring-purple-600">
+        </div>
+        <div class="space-y-1.5">
+          <label class="block text-sm font-medium text-gray-700">Password</label>
+          <input type="password" name="password" autocomplete="current-password" required class="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-600 focus:ring-purple-600">
+        </div>
+        {% if form.errors %}
+          <p class="text-sm text-red-600">Please check your username and password.</p>
+        {% endif %}
+        <div class="pt-2">
+          <button type="submit" class="inline-flex w-full items-center justify-center rounded-md bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600">
+            Sign in
+          </button>
+        </div>
+      </form>
+      <div class="mt-6 border-t border-gray-200 pt-6">
+        <p class="text-sm text-gray-600">
+          Or, if configured, use
+          <a href="/oidc/authenticate/" class="font-medium text-purple-700 hover:text-purple-800">OIDC login</a>.
+        </p>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

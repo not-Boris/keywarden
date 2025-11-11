@@ -1,0 +1,39 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{# Keep Unfold's native dashboard, then append our stats #}
+{% block content %}
+  {{ block.super }}
+
+  <div class="kw-wrap">
+    <div class="kw-card">
+      <div class="kw-stack">
+        <div>
+          <h3 class="kw-title">{% trans "Authentication Mode" %}</h3>
+          <p class="kw-subtitle">
+            <span class="kw-pill">
+              {% trans "Mode" %}: {{ dashboard_status.auth_mode|default:"hybrid" }}
+            </span>
+          </p>
+        </div>
+        <div>
+          <h3 class="kw-title">{% trans "OIDC Status" %}</h3>
+          {% if dashboard_status.oidc_configured %}
+            <p class="kw-subtitle kw-good">{% trans "Configured" %}</p>
+          {% else %}
+            <p class="kw-subtitle kw-warn">{% trans "Unconfigured" %}</p>
+          {% endif %}
+        </div>
+        <div>
+          <h3 class="kw-title">{% trans "Users" %}</h3>
+          <p class="kw-count">{{ dashboard_status.user_count }}</p>
+          <p class="kw-subtitle {% if dashboard_status.has_superuser %}kw-good{% else %}kw-bad{% endif %}">
+            {% trans "Superuser present" %}: {% if dashboard_status.has_superuser %}{% trans "Yes" %}{% else %}{% trans "No" %}{% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+

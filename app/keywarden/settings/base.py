@@ -32,9 +32,12 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework",
+    "apps.audit",
     "apps.accounts",
     "apps.core",
     "apps.dashboard",
+    "apps.servers",
     "ninja",                # Django Ninja API
     "mozilla_django_oidc",   # OIDC Client
     "tailwind",
@@ -99,14 +102,12 @@ TEMPLATES = [
             "django.template.context_processors.request",
             "django.contrib.auth.context_processors.auth",
             "django.contrib.messages.context_processors.messages",
+            "apps.dashboard.context.dashboard_status",
         ]},
     },
 ]
 
-AUTHENTICATION_BACKENDS = [
-    "mozilla_django_oidc.auth.OIDCAuthenticationBackend",  # OIDC authentication
-    "django.contrib.auth.backends.ModelBackend",           # default Django auth
-]
+# AUTHENTICATION_BACKENDS is configured dynamically below based on KEYWARDEN_AUTH_MODE
 
 UNFOLD = {
     "SITE_TITLE": "Keywarden Admin",
@@ -138,6 +139,7 @@ UNFOLD = {
     "STYLES": [
         "/static/unfold/css/styles.css",
         "/static/unfold/css/simplebar.css",
+        (lambda request: "/static/unfold/css/keywarden.css"),
     ],
     "SCRIPTS": [
         "/static/unfold/js/simplebar.js",
@@ -162,21 +164,40 @@ UNFOLD = {
         },
 
     ],
-    # "TABS": [
-    #     {
-    #         "models": [
-    #             "keywarden.accounts",
-    #         ],
-    #         "items": [
-    #             {
-    #                 "title": _("Accounts"),
-    #                 "link": reverse_lazy("admin:accounts"),
-    #                 "permission": "keywarden.permission_callback",
-    #             },
-    #         ],
-    #     },
-    # ],    
+    "TABS": [
+        {
+            "models": [
+                "auth.User",
+            ],
+            "items": [
+                {
+                    "title": _("Logs"),
+                    "link": reverse_lazy("admin:audit_auditlog_changelist"),
+                    "attrs": {"hx-boost": "true"},
+                },
+                {
+                    "title": _("Event Types"),
+                    "link": reverse_lazy("admin:audit_auditeventtype_changelist"),
+                    "attrs": {"hx-boost": "true"},
+                },
+            ],
+        },
+        {
+            "models": [
+                "servers.Server",
+            ],
+            "items": [
+                {
+                    "title": _("Servers"),
+                    "link": reverse_lazy("admin:servers_server_changelist"),
+                    "attrs": {"hx-boost": "true"},
+                },
+            ],
+        },
+    ],    
 }
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR/"media"
 
 OIDC_RP_CLIENT_ID = os.getenv("KEYWARDEN_OIDC_CLIENT_ID")
 OIDC_RP_CLIENT_SECRET = os.getenv("KEYWARDEN_OIDC_CLIENT_SECRET")
@@ -185,7 +206,24 @@ OIDC_OP_TOKEN_ENDPOINT = os.getenv("KEYWARDEN_OIDC_TOKEN_ENDPOINT")
 OIDC_OP_USER_ENDPOINT = os.getenv("KEYWARDEN_OIDC_USER_ENDPOINT")
 OIDC_OP_JWKS_ENDPOINT = os.getenv("KEYWARDEN_OIDC_JWKS_ENDPOINT")
 
-LOGIN_URL = "/oidc/authenticate/"
+# Auth mode: native | oidc | hybrid
+AUTH_MODE = os.getenv("KEYWARDEN_AUTH_MODE", "hybrid").lower()
+if AUTH_MODE not in {"native", "oidc", "hybrid"}:
+    AUTH_MODE = "hybrid"
+KEYWARDEN_AUTH_MODE = AUTH_MODE
+
+if AUTH_MODE == "oidc":
+    AUTHENTICATION_BACKENDS = [
+        "mozilla_django_oidc.auth.OIDCAuthenticationBackend",
+    ]
+    LOGIN_URL = "/oidc/authenticate/"
+else:
+    # native or hybrid -> allow both, native first for precedence
+    AUTHENTICATION_BACKENDS = [
+        "django.contrib.auth.backends.ModelBackend",
+        "mozilla_django_oidc.auth.OIDCAuthenticationBackend",
+    ]
+    LOGIN_URL = "/accounts/login/"
 LOGOUT_URL = "/oidc/logout/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"

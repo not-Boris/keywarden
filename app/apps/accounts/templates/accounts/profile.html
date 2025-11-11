@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Profile • Keywarden{% endblock %}
+
+{% block content %}
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div>
+      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
+        <h1 class="mb-6 text-xl font-semibold tracking-tight text-gray-900">Your Profile</h1>
+        <dl class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Username</dt>
+            <dd class="mt-1 text-sm text-gray-900">{{ user.username }}</dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Email</dt>
+            <dd class="mt-1 text-sm text-gray-900">{{ user.email }}</dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">First name</dt>
+            <dd class="mt-1 text-sm text-gray-900">{{ user.first_name|default:"—" }}</dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Last name</dt>
+            <dd class="mt-1 text-sm text-gray-900">{{ user.last_name|default:"—" }}</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+    <div>
+      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
+        <h2 class="mb-4 text-base font-semibold tracking-tight text-gray-900">Single Sign-On</h2>
+        {% if auth_mode == "hybrid" %}
+          <div class="mt-6 border-t border-gray-200 pt-6">
+            <p class="text-sm text-gray-600">
+              Optional: Link your account with your identity provider for single sign-on.
+              <a href="/oidc/authenticate/" class="font-medium text-purple-700 hover:text-purple-800">Link with SSO</a>
+            </p>
+          </div>
+        {% elif auth_mode == "oidc" %}
+          <p class="text-sm text-gray-600">OIDC is required. Sign-in is managed by your identity provider.</p>
+        {% else %}
+          <p class="text-sm text-gray-600">OIDC is disabled. You are using native authentication.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

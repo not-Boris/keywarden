@@ -19,6 +19,9 @@ module.exports = {
          * Adjust the following line to match your project structure.
          */
         '../../templates/**/*.html',
+        // Ensure admin overrides are scanned
+        '../../templates/admin/**/*.html',
+        '../../templates/admin/*.html',
 
         /*
          * Templates in other django apps (BASE_DIR/<any_app_name>/templates).
@@ -41,6 +44,9 @@ module.exports = {
          */
         // '../../**/*.py'
     ],
+    // corePlugins: {
+    //     preflight: false,
+    // },
     theme: {
         extend: {},
     },
