@@ -20,8 +20,8 @@ services:
     container_name: keywarden
     volumes:
       - ./app:/app
-      - ./nginx/certs:/certs:ro
-      - ./nginx/logs:/etc/nginx/logs
+      - ./nginx/certs:/etc/nginx/certs
+      - ./nginx/logs:/var/log/nginx
     ports:
       - "443:443"
     depends_on:

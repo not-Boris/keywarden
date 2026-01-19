@@ -1,0 +1,60 @@
+# This file should be put under /etc/nginx/conf.d/
+# Or place as /etc/nginx/nginx.conf
+
+user nginx;
+worker_processes auto;
+
+error_log /var/log/nginx/error.log warn;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    real_ip_header X-Forwarded-For;
+    include       /etc/nginx/mime.types;
+    include options-ssl.conf;
+    include options-http-headers.conf;
+    default_type  application/octet-stream;
+
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    server {
+        listen 80;
+        listen [::]:80;
+        server_name __SERVER_NAME__;
+        return 301 https://$host$request_uri;
+    }
+
+    server {
+        listen 443 ssl;
+        listen [::]:443 ssl;
+        http2 on;
+        server_name __SERVER_NAME__;
+
+        error_log /var/log/nginx/error.log warn;
+        access_log  /var/log/nginx/access.log main;
+
+        ssl_certificate /etc/nginx/certs/certificate.pem;
+        ssl_certificate_key /etc/nginx/certs/key.pem;
+        include options-ssl.conf;
+        include options-https-headers.conf;
+
+        client_max_body_size 50M;
+
+        location / {
+            proxy_pass  http://127.0.0.1:8000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto  $scheme;
+            include options-https-headers.conf;
+            }
+    }
+
+    access_log  /var/log/nginx/access.log main;
+    types_hash_bucket_size 128;
+}

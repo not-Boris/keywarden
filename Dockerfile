@@ -13,12 +13,16 @@ WORKDIR /app
 # System deps for psycopg2, node (for Tailwind), etc.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    ca-certificates \
     libpq-dev \
     curl \
+    openssl \
     nginx \
     nodejs \
     npm \
     supervisor \
+    mkcert \
+    libnss3-tools \
     valkey-server \
     && rm -rf /var/lib/apt/lists/*
 
@@ -45,7 +49,7 @@ RUN pip install --upgrade pip \
 WORKDIR /app
 COPY ./app .
 
-COPY nginx/configs/nginx.conf /etc/nginx/nginx.conf
+COPY nginx/configs/nginx.conf.template /etc/nginx/nginx.conf.template
 COPY nginx/configs/options-* /etc/nginx/
 #COPY nginx/configs/sites/ /etc/nginx/conf.d/
 COPY supervisor/supervisord.conf /etc/supervisor/supervisord.conf
