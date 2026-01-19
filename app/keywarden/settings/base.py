@@ -86,6 +86,14 @@ CACHES = {
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"
 
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+    "django.contrib.auth.hashers.ScryptPasswordHasher",
+]
+
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR/"static"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
@@ -143,25 +151,6 @@ UNFOLD = {
     ],
     "SCRIPTS": [
         "/static/unfold/js/simplebar.js",
-    ],
-    "SITE_DROPDOWN": [
-        {
-            "icon": "diamond",
-            "title": _("Keywarden Development"),
-            "link": "https://keywarden.dev.ntbx.io",
-            "attrs": {
-                "target": "_blank",
-            },
-        },
-        {
-            "icon": "diamond",
-            "title": _("Keywarden [Inactive]"),
-            "link": "https://keywarden.ntbx.io",
-            "attrs": {
-                "target": "_blank",
-            },
-        },
-
     ],
     "TABS": [
         {

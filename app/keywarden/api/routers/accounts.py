@@ -3,8 +3,6 @@ from typing import Optional
 from django.http import HttpRequest
 from ninja import Router, Schema
 
-router = Router()
-
 
 class UserSchema(Schema):
     id: int
@@ -16,17 +14,24 @@ class UserSchema(Schema):
     is_superuser: bool
 
 
-@router.get("/me", response=UserSchema)
-def me(request: HttpRequest):
-    user = request.user
-    return {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email or "",
-        "first_name": user.first_name or "",
-        "last_name": user.last_name or "",
-        "is_staff": bool(user.is_staff),
-        "is_superuser": bool(user.is_superuser),
-    }
+def build_router() -> Router:
+    router = Router()
 
+    @router.get("/me", response=UserSchema)
+    def me(request: HttpRequest):
+        user = request.user
+        return {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email or "",
+            "first_name": user.first_name or "",
+            "last_name": user.last_name or "",
+            "is_staff": bool(user.is_staff),
+            "is_superuser": bool(user.is_superuser),
+        }
+
+    return router
+
+
+router = build_router()
 

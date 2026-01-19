@@ -4,10 +4,19 @@ from ninja import NinjaAPI, Router, Schema
 from ninja.security import django_auth
 
 from .security import JWTAuth
-from .routers.accounts import router as accounts_router
-from .routers.audit import router as audit_router
-from .routers.system import router as system_router
-from .routers.servers import router as servers_router
+from .routers.accounts import build_router as build_accounts_router
+from .routers.audit import build_router as build_audit_router
+from .routers.system import build_router as build_system_router
+from .routers.servers import build_router as build_servers_router
+from .routers.users import build_router as build_users_router
+
+
+def register_routers(target_api: NinjaAPI) -> None:
+    target_api.add_router("/system", build_system_router(), tags=["system"])
+    target_api.add_router("/user", build_accounts_router(), tags=["user"])
+    target_api.add_router("/audit", build_audit_router(), tags=["audit"])
+    target_api.add_router("/servers", build_servers_router(), tags=["servers"])
+    target_api.add_router("/users", build_users_router(), tags=["users"])
 
 
 api = NinjaAPI(
@@ -17,11 +26,14 @@ api = NinjaAPI(
     auth=[django_auth, JWTAuth()],
     csrf=True,  # enforce CSRF for session-authenticated unsafe requests
 )
+register_routers(api)
 
-# Mount routers
-api.add_router("/system", system_router, tags=["system"])
-api.add_router("/user", accounts_router, tags=["user"])
-api.add_router("/audit", audit_router, tags=["audit"])
-api.add_router("/servers", servers_router, tags=["servers"])
-
-
+api_v1 = NinjaAPI(
+    title="Keywarden API",
+    version="1.0.0",
+    description="Authenticated API for internal app use and external clients.",
+    auth=[django_auth, JWTAuth()],
+    csrf=True,
+    urls_namespace="api-v1",
+)
+register_routers(api_v1)
