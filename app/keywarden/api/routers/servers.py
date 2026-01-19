@@ -47,6 +47,7 @@ def build_router() -> Router:
 
     @router.get("/", response=List[ServerOut])
     def list_servers(request: HttpRequest):
+        """List servers visible to authenticated users."""
         servers = Server.objects.all()
         return [
             {
@@ -63,6 +64,7 @@ def build_router() -> Router:
 
     @router.get("/{server_id}", response=ServerOut)
     def get_server(request: HttpRequest, server_id: int):
+        """Get server details by id."""
         try:
             server = Server.objects.get(id=server_id)
         except Server.DoesNotExist:
@@ -79,6 +81,7 @@ def build_router() -> Router:
 
     @router.post("/", response=ServerOut)
     def create_server_json(request: HttpRequest, payload: ServerCreate):
+        """Create a server using JSON payload (admin only)."""
         _require_admin(request)
         server = Server.objects.create(
             display_name=payload.display_name.strip(),
@@ -105,6 +108,7 @@ def build_router() -> Router:
         ipv6: Optional[str] = Form(None),
         image: Optional[UploadedFile] = File(None),
     ):
+        """Create a server with optional image upload (admin only)."""
         _require_admin(request)
         server = Server(
             display_name=display_name.strip(),
@@ -127,6 +131,7 @@ def build_router() -> Router:
 
     @router.patch("/{server_id}", response=ServerOut)
     def update_server(request: HttpRequest, server_id: int, payload: ServerUpdate):
+        """Update server fields (admin only)."""
         _require_admin(request)
         if (
             payload.display_name is None
@@ -166,6 +171,7 @@ def build_router() -> Router:
 
     @router.delete("/{server_id}", response={204: None})
     def delete_server(request: HttpRequest, server_id: int):
+        """Delete a server by id (admin only)."""
         _require_admin(request)
         try:
             server = Server.objects.get(id=server_id)

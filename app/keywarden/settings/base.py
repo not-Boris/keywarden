@@ -38,6 +38,9 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.dashboard",
     "apps.servers",
+    "apps.keys",
+    "apps.access",
+    "apps.telemetry",
     "ninja",                # Django Ninja API
     "mozilla_django_oidc",   # OIDC Client
     "tailwind",

@@ -68,6 +68,7 @@ def build_router() -> Router:
 
     @router.post("/", response=UserDetailOut)
     def create_user(request: HttpRequest, payload: UserCreateIn):
+        """Create a user with role and password (admin only)."""
         _require_admin(request)
         User = get_user_model()
         email = payload.email.strip().lower()
@@ -89,6 +90,7 @@ def build_router() -> Router:
 
     @router.get("/", response=List[UserListOut])
     def list_users(request: HttpRequest, pagination: UsersQuery = Query(...)):
+        """List users with pagination (admin only)."""
         _require_admin(request)
         User = get_user_model()
         qs = User.objects.order_by("id")[pagination.offset : pagination.offset + pagination.limit]
@@ -104,6 +106,7 @@ def build_router() -> Router:
 
     @router.get("/{user_id}", response=UserDetailOut)
     def get_user(request: HttpRequest, user_id: int):
+        """Get user details by id (admin only)."""
         _require_admin(request)
         User = get_user_model()
         try:
@@ -119,6 +122,7 @@ def build_router() -> Router:
 
     @router.patch("/{user_id}", response=UserDetailOut)
     def update_user(request: HttpRequest, user_id: int, payload: UserUpdateIn):
+        """Update user fields such as role, email, or status (admin only)."""
         _require_admin(request)
         if payload.email is None and payload.password is None and payload.role is None and payload.is_active is None:
             raise HttpError(422, {"detail": "No fields provided."})
@@ -149,6 +153,7 @@ def build_router() -> Router:
 
     @router.delete("/{user_id}", response={204: None})
     def delete_user(request: HttpRequest, user_id: int):
+        """Delete a user by id (admin only)."""
         _require_admin(request)
         User = get_user_model()
         try:

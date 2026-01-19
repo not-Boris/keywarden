@@ -12,10 +12,10 @@ def build_router() -> Router:
 
     @router.get("/health", response=HealthResponse)
     def health() -> HealthResponse:
+        """Health check endpoint for service monitoring."""
         return {"status": "ok"}
 
     return router
 
 
 router = build_router()
-

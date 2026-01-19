@@ -46,6 +46,7 @@ def build_router() -> Router:
 
     @router.get("/event-types", response=List[AuditEventTypeSchema])
     def list_event_types(request: HttpRequest):
+        """List audit event types and their default severity."""
         qs: QuerySet[AuditEventType] = AuditEventType.objects.all()
         return [
             {
@@ -60,6 +61,7 @@ def build_router() -> Router:
 
     @router.get("/logs", response=List[AuditLogSchema])
     def list_logs(request: HttpRequest, filters: LogsQuery = Query(...)):
+        """List audit logs with optional filters and pagination."""
         qs: QuerySet[AuditLog] = AuditLog.objects.select_related("event_type", "actor").all()
         if filters.severity:
             qs = qs.filter(severity=filters.severity)
@@ -92,4 +94,3 @@ def build_router() -> Router:
 
 
 router = build_router()
-

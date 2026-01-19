@@ -9,6 +9,10 @@ from .routers.audit import build_router as build_audit_router
 from .routers.system import build_router as build_system_router
 from .routers.servers import build_router as build_servers_router
 from .routers.users import build_router as build_users_router
+from .routers.keys import build_router as build_keys_router
+from .routers.access import build_router as build_access_router
+from .routers.telemetry import build_router as build_telemetry_router
+from .routers.agent import build_router as build_agent_router
 
 
 def register_routers(target_api: NinjaAPI) -> None:
@@ -17,6 +21,10 @@ def register_routers(target_api: NinjaAPI) -> None:
     target_api.add_router("/audit", build_audit_router(), tags=["audit"])
     target_api.add_router("/servers", build_servers_router(), tags=["servers"])
     target_api.add_router("/users", build_users_router(), tags=["users"])
+    target_api.add_router("/keys", build_keys_router(), tags=["keys"])
+    target_api.add_router("/access-requests", build_access_router(), tags=["access"])
+    target_api.add_router("/telemetry", build_telemetry_router(), tags=["telemetry"])
+    target_api.add_router("/agent", build_agent_router(), tags=["agent"])
 
 
 api = NinjaAPI(

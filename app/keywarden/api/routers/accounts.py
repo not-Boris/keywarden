@@ -19,6 +19,7 @@ def build_router() -> Router:
 
     @router.get("/me", response=UserSchema)
     def me(request: HttpRequest):
+        """Return the current authenticated user's profile."""
         user = request.user
         return {
             "id": user.id,
@@ -34,4 +35,3 @@ def build_router() -> Router:
 
 
 router = build_router()
-
