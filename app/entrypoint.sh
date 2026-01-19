@@ -11,6 +11,5 @@ python manage.py collectstatic --noinput
 python manage.py migrate --noinput
 python manage.py ensure_admin
 
-exec gunicorn keywarden.wsgi:application --bind 0.0.0.0:80 --workers 3
-
+exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
 

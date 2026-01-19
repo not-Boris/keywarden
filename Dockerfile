@@ -15,8 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     curl \
+    nginx \
     nodejs \
     npm \
+    supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 # =============================================
@@ -42,16 +44,24 @@ RUN pip install --upgrade pip \
 WORKDIR /app
 COPY ./app .
 
+COPY nginx/configs/nginx.conf /etc/nginx/nginx.conf
+COPY nginx/configs/options-* /etc/nginx/
+#COPY nginx/configs/sites/ /etc/nginx/conf.d/
+COPY supervisor/supervisord.conf /etc/supervisor/supervisord.conf
+
 RUN python manage.py collectstatic --noinput
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh /app/scripts/gunicorn.sh
 
 # =============================================
-# 5. Create non-root user
+# 5. Create users for services
 # =============================================
-RUN adduser --disabled-password --gecos '' djangouser
-USER djangouser
+RUN adduser --system --no-create-home --group nginx \
+    && adduser --disabled-password --gecos '' djangouser
 
-EXPOSE 80
+RUN mkdir -p /var/cache/nginx \
+    && chown -R nginx:nginx /var/cache/nginx
+
+EXPOSE 443 8008
 
 # =============================================
 # 6. Launch the app
