@@ -218,9 +218,6 @@ __marimo__/
 # Certificates
 *.pem
 
-# Docker
-*compose.yml
-
 nginx/logs/*
 nginx/certs/*.pem
 
