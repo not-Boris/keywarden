@@ -7,6 +7,7 @@ Pillow>=10.0.0
 mozilla-django-oidc>=4.0.0
 django-unfold>=0.70.0
 django-tailwind==4.4.0
+argon2-cffi>=23.1.0
 psycopg2-binary>=2.9.9
 gunicorn==23.0.0
 paramiko==4.0.0
@@ -16,3 +17,4 @@ python-dotenv>=1.2
 whitenoise>=6.6
 cookiecutter>=2.6
 distlib>=0.3.8
+email-validator>=2.1.0
