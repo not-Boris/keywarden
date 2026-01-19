@@ -143,7 +143,6 @@ UNFOLD = {
     ],
     "SCRIPTS": [
         "/static/unfold/js/simplebar.js",
-        "/static/unfold/js/alpine.js",
     ],
     "SITE_DROPDOWN": [
         {
