@@ -35,7 +35,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "apps.audit",
     "apps.accounts",
-    "apps.core",
+    "apps.core.apps.CoreConfig",
     "apps.dashboard",
     "apps.servers",
     "apps.keys",
@@ -54,6 +54,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.audit.middleware.ApiAuditLogMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

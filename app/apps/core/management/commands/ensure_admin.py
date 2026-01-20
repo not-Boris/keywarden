@@ -3,6 +3,8 @@ import os
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
+from apps.core.rbac import ROLE_ADMIN, set_user_role
+
 
 class Command(BaseCommand):
     help = "Ensure a Django superuser exists using environment variables"
@@ -41,6 +43,7 @@ class Command(BaseCommand):
 
         if created:
             user.set_password(password)
+            set_user_role(user, ROLE_ADMIN)
             user.save()
             self.stdout.write(self.style.SUCCESS(f"Superuser '{username}' created."))
             return
@@ -59,10 +62,11 @@ class Command(BaseCommand):
             user.is_superuser = True
             changed = True
 
+        set_user_role(user, ROLE_ADMIN)
+
         if changed:
             user.save()
             self.stdout.write(self.style.SUCCESS(f"Superuser '{username}' updated."))
         else:
             self.stdout.write(self.style.SUCCESS(f"Superuser '{username}' already present."))
-
 

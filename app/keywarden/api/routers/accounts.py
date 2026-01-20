@@ -3,6 +3,7 @@ from typing import Optional
 from django.http import HttpRequest
 from ninja import Router, Schema
 
+from apps.core.rbac import require_authenticated
 
 class UserSchema(Schema):
     id: int
@@ -20,6 +21,7 @@ def build_router() -> Router:
     @router.get("/me", response=UserSchema)
     def me(request: HttpRequest):
         """Return the current authenticated user's profile."""
+        require_authenticated(request)
         user = request.user
         return {
             "id": user.id,

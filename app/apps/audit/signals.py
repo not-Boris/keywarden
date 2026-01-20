@@ -6,6 +6,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 from .models import AuditEventType, AuditLog
+from .utils import get_client_ip
 
 User = get_user_model()
 
@@ -28,7 +29,7 @@ def on_user_logged_in(sender, request, user: User, **kwargs):
         message=f"User {user} logged in",
         severity=event.default_severity,
         source=AuditLog.Source.UI,
-        ip_address=(request.META.get("REMOTE_ADDR") if request else None),
+        ip_address=get_client_ip(request),
         user_agent=(request.META.get("HTTP_USER_AGENT") if request else ""),
         metadata={"path": request.path} if request else {},
     )
@@ -44,9 +45,7 @@ def on_user_logged_out(sender, request, user: User, **kwargs):
         message=f"User {user} logged out",
         severity=event.default_severity,
         source=AuditLog.Source.UI,
-        ip_address=(request.META.get("REMOTE_ADDR") if request else None),
+        ip_address=get_client_ip(request),
         user_agent=(request.META.get("HTTP_USER_AGENT") if request else ""),
         metadata={"path": request.path} if request else {},
     )
-
-

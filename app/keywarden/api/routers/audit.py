@@ -8,6 +8,7 @@ from django.http import HttpRequest
 from ninja import Query, Router, Schema
 
 from apps.audit.models import AuditEventType, AuditLog
+from apps.core.rbac import ROLE_ADMIN, ROLE_AUDITOR, ROLE_OPERATOR, require_roles
 
 class AuditEventTypeSchema(Schema):
     id: int
@@ -47,6 +48,7 @@ def build_router() -> Router:
     @router.get("/event-types", response=List[AuditEventTypeSchema])
     def list_event_types(request: HttpRequest):
         """List audit event types and their default severity."""
+        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_AUDITOR)
         qs: QuerySet[AuditEventType] = AuditEventType.objects.all()
         return [
             {
@@ -62,6 +64,7 @@ def build_router() -> Router:
     @router.get("/logs", response=List[AuditLogSchema])
     def list_logs(request: HttpRequest, filters: LogsQuery = Query(...)):
         """List audit logs with optional filters and pagination."""
+        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_AUDITOR)
         qs: QuerySet[AuditLog] = AuditLog.objects.select_related("event_type", "actor").all()
         if filters.severity:
             qs = qs.filter(severity=filters.severity)

@@ -7,6 +7,7 @@ from django.http import HttpRequest
 from ninja import File, Form, Router, Schema
 from ninja.files import UploadedFile
 from ninja.errors import HttpError
+from apps.core.rbac import ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER, require_roles
 from apps.servers.models import Server
 
 
@@ -34,20 +35,13 @@ class ServerUpdate(Schema):
     ipv6: Optional[str] = None
 
 
-def _require_admin(request: HttpRequest) -> None:
-    user = request.user
-    if not getattr(user, "is_authenticated", False):
-        raise HttpError(403, "Forbidden")
-    if not (user.is_staff or user.is_superuser):
-        raise HttpError(403, "Forbidden")
-
-
 def build_router() -> Router:
     router = Router()
 
     @router.get("/", response=List[ServerOut])
     def list_servers(request: HttpRequest):
         """List servers visible to authenticated users."""
+        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
         servers = Server.objects.all()
         return [
             {
@@ -65,6 +59,7 @@ def build_router() -> Router:
     @router.get("/{server_id}", response=ServerOut)
     def get_server(request: HttpRequest, server_id: int):
         """Get server details by id."""
+        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
         try:
             server = Server.objects.get(id=server_id)
         except Server.DoesNotExist:
@@ -82,7 +77,7 @@ def build_router() -> Router:
     @router.post("/", response=ServerOut)
     def create_server_json(request: HttpRequest, payload: ServerCreate):
         """Create a server using JSON payload (admin only)."""
-        _require_admin(request)
+        require_roles(request, ROLE_ADMIN)
         server = Server.objects.create(
             display_name=payload.display_name.strip(),
             hostname=(payload.hostname or "").strip() or None,
@@ -109,7 +104,7 @@ def build_router() -> Router:
         image: Optional[UploadedFile] = File(None),
     ):
         """Create a server with optional image upload (admin only)."""
-        _require_admin(request)
+        require_roles(request, ROLE_ADMIN)
         server = Server(
             display_name=display_name.strip(),
             hostname=(hostname or "").strip() or None,
@@ -132,7 +127,7 @@ def build_router() -> Router:
     @router.patch("/{server_id}", response=ServerOut)
     def update_server(request: HttpRequest, server_id: int, payload: ServerUpdate):
         """Update server fields (admin only)."""
-        _require_admin(request)
+        require_roles(request, ROLE_ADMIN)
         if (
             payload.display_name is None
             and payload.hostname is None
@@ -172,7 +167,7 @@ def build_router() -> Router:
     @router.delete("/{server_id}", response={204: None})
     def delete_server(request: HttpRequest, server_id: int):
         """Delete a server by id (admin only)."""
-        _require_admin(request)
+        require_roles(request, ROLE_ADMIN)
         try:
             server = Server.objects.get(id=server_id)
         except Server.DoesNotExist:

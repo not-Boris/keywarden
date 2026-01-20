@@ -10,6 +10,7 @@ from ninja import Query, Router, Schema
 from ninja.errors import HttpError
 from pydantic import Field
 
+from apps.core.rbac import ROLE_ADMIN, ROLE_OPERATOR, require_roles
 from apps.servers.models import Server
 from apps.telemetry.models import TelemetryEvent
 
@@ -51,14 +52,6 @@ class TelemetryQuery(Schema):
     success: Optional[bool] = None
 
 
-def _require_admin(request: HttpRequest) -> None:
-    user = request.user
-    if not getattr(user, "is_authenticated", False):
-        raise HttpError(403, "Forbidden")
-    if not (user.is_staff or user.is_superuser):
-        raise HttpError(403, "Forbidden")
-
-
 def _event_to_out(event: TelemetryEvent) -> TelemetryOut:
     return TelemetryOut(
         id=event.id,
@@ -78,8 +71,8 @@ def build_router() -> Router:
 
     @router.get("/", response=List[TelemetryOut])
     def list_events(request: HttpRequest, filters: TelemetryQuery = Query(...)):
-        """List telemetry events with filters (admin only)."""
-        _require_admin(request)
+        """List telemetry events with filters (admin or operator)."""
+        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR)
         qs = TelemetryEvent.objects.order_by("-created_at")
         if filters.event_type:
             qs = qs.filter(event_type=filters.event_type)
@@ -94,8 +87,8 @@ def build_router() -> Router:
 
     @router.post("/", response=TelemetryOut)
     def create_event(request: HttpRequest, payload: TelemetryCreateIn):
-        """Create a telemetry event entry (admin only)."""
-        _require_admin(request)
+        """Create a telemetry event entry (admin or operator)."""
+        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR)
         server = None
         if payload.server_id:
             try:
@@ -122,8 +115,8 @@ def build_router() -> Router:
 
     @router.get("/summary", response=TelemetrySummaryOut)
     def summary(request: HttpRequest):
-        """Return a high-level telemetry summary (admin only)."""
-        _require_admin(request)
+        """Return a high-level telemetry summary (admin or operator)."""
+        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR)
         totals = TelemetryEvent.objects.aggregate(
             total=Count("id"),
             success=Count("id", filter=models.Q(success=True)),
