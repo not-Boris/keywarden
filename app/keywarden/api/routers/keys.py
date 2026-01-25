@@ -69,7 +69,14 @@ def build_router() -> Router:
 
     @router.get("/", response=List[KeyOut])
     def list_keys(request: HttpRequest, filters: KeysQuery = Query(...)):
-        """List SSH keys for the current user, or any user if admin/operator."""
+        """List SSH keys with pagination and filters.
+
+        Auth: required.
+        Permissions:
+        - If user has global `keys.view_sshkey`, returns all keys.
+        - Otherwise, returns only objects with `keys.view_sshkey` object permission.
+        Filter: user_id (honored only with global view).
+        """
         require_authenticated(request)
         user = request.user
         if _has_global_perm(request, "keys.view_sshkey"):
@@ -89,7 +96,15 @@ def build_router() -> Router:
 
     @router.post("/", response=KeyOut)
     def create_key(request: HttpRequest, payload: KeyCreateIn):
-        """Create an SSH public key for the current user (admin/operator can specify user_id)."""
+        """Create an SSH public key.
+
+        Auth: required.
+        Permissions: requires global `keys.add_sshkey`.
+        Rules:
+        - Default owner is the current user.
+        - If caller has global `keys.add_sshkey` and `keys.view_sshkey`, they may specify user_id.
+        Side effects: grants owner object perms on the new key.
+        """
         require_authenticated(request)
         if not request.user.has_perm("keys.add_sshkey"):
             raise HttpError(403, "Forbidden")
@@ -121,7 +136,11 @@ def build_router() -> Router:
 
     @router.get("/{key_id}", response=KeyOut)
     def get_key(request: HttpRequest, key_id: int):
-        """Get a specific SSH key if permitted."""
+        """Get a specific SSH key by id.
+
+        Auth: required.
+        Permissions: requires `keys.view_sshkey` on the object.
+        """
         require_authenticated(request)
         try:
             key = SSHKey.objects.get(id=key_id)
@@ -133,7 +152,11 @@ def build_router() -> Router:
 
     @router.patch("/{key_id}", response=KeyOut)
     def update_key(request: HttpRequest, key_id: int, payload: KeyUpdateIn):
-        """Update key name or active state if permitted."""
+        """Update key name or active state.
+
+        Auth: required.
+        Permissions: requires `keys.change_sshkey` on the object.
+        """
         require_authenticated(request)
         try:
             key = SSHKey.objects.get(id=key_id)
@@ -159,7 +182,12 @@ def build_router() -> Router:
 
     @router.delete("/{key_id}", response={204: None})
     def delete_key(request: HttpRequest, key_id: int):
-        """Revoke an SSH key if permitted (soft delete)."""
+        """Revoke (soft delete) an SSH key.
+
+        Auth: required.
+        Permissions: requires `keys.delete_sshkey` on the object.
+        Behavior: sets is_active false and revoked_at if key is active.
+        """
         require_authenticated(request)
         try:
             key = SSHKey.objects.get(id=key_id)

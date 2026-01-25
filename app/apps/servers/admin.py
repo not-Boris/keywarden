@@ -1,17 +1,27 @@
 from django.contrib import admin
-from guardian.admin import GuardedModelAdmin
 from django.utils.html import format_html
-from .models import Server
+from guardian.admin import GuardedModelAdmin
+
+from .models import AgentCertificateAuthority, EnrollmentToken, Server
 
 
 @admin.register(Server)
 class ServerAdmin(GuardedModelAdmin):
-    list_display = ("avatar", "display_name", "hostname", "ipv4", "ipv6", "created_at")
+    list_display = ("avatar", "display_name", "hostname", "ipv4", "ipv6", "agent_enrolled_at", "created_at")
     list_display_links = ("display_name",)
     search_fields = ("display_name", "hostname", "ipv4", "ipv6")
     list_filter = ("created_at",)
-    readonly_fields = ("created_at", "updated_at")
-    fields = ("display_name", "hostname", "ipv4", "ipv6", "image", "created_at", "updated_at")
+    readonly_fields = ("created_at", "updated_at", "agent_enrolled_at")
+    fields = (
+        "display_name",
+        "hostname",
+        "ipv4",
+        "ipv6",
+        "image",
+        "agent_enrolled_at",
+        "created_at",
+        "updated_at",
+    )
 
     def avatar(self, obj: Server):
         if obj.image_url:
@@ -27,3 +37,52 @@ class ServerAdmin(GuardedModelAdmin):
         )
     avatar.short_description = ""
 
+
+@admin.register(EnrollmentToken)
+class EnrollmentTokenAdmin(admin.ModelAdmin):
+    list_display = ("token", "created_at", "expires_at", "used_at", "server")
+    list_filter = ("created_at", "used_at")
+    search_fields = ("token", "server__display_name", "server__hostname")
+    readonly_fields = ("token", "created_at", "used_at", "server", "created_by")
+    fields = ("token", "expires_at", "created_by", "created_at", "used_at", "server")
+
+    def save_model(self, request, obj, form, change) -> None:
+        if not obj.pk:
+            obj.ensure_token()
+            if request.user and request.user.is_authenticated and not obj.created_by_id:
+                obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(AgentCertificateAuthority)
+class AgentCertificateAuthorityAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_active", "created_at", "revoked_at")
+    list_filter = ("is_active", "created_at", "revoked_at")
+    search_fields = ("name", "fingerprint")
+    readonly_fields = ("fingerprint", "serial", "created_at", "revoked_at", "created_by")
+    fields = (
+        "name",
+        "is_active",
+        "cert_pem",
+        "key_pem",
+        "fingerprint",
+        "serial",
+        "created_by",
+        "created_at",
+        "revoked_at",
+    )
+    actions = ["revoke_selected"]
+
+    def save_model(self, request, obj, form, change) -> None:
+        if request.user and request.user.is_authenticated and not obj.created_by_id:
+            obj.created_by = request.user
+        obj.ensure_material()
+        if obj.is_active:
+            AgentCertificateAuthority.objects.exclude(pk=obj.pk).update(is_active=False)
+        super().save_model(request, obj, form, change)
+
+    @admin.action(description="Revoke selected CAs")
+    def revoke_selected(self, request, queryset):
+        for ca in queryset:
+            ca.revoke()
+            ca.save(update_fields=["is_active", "revoked_at"])

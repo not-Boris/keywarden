@@ -70,7 +70,14 @@ def build_router() -> Router:
 
     @router.get("/", response=List[AccessRequestOut])
     def list_requests(request: HttpRequest, filters: AccessQuery = Query(...)):
-        """List access requests for the user, or all if admin/operator."""
+        """List access requests with pagination and filters.
+
+        Auth: required.
+        Permissions:
+        - If user has global `access.view_accessrequest`, returns all requests.
+        - Otherwise, returns only objects with `access.view_accessrequest` object permission.
+        Filters: status, server_id, requester_id (requester_id is honored only with global view).
+        """
         require_authenticated(request)
         user = request.user
         if _has_global_perm(request, "access.view_accessrequest"):
@@ -94,7 +101,12 @@ def build_router() -> Router:
 
     @router.post("/", response=AccessRequestOut)
     def create_request(request: HttpRequest, payload: AccessRequestCreateIn):
-        """Create a new access request for a server."""
+        """Create a new access request for the current user.
+
+        Auth: required.
+        Permissions: requires global `access.add_accessrequest`.
+        Side effects: grants owner object perms on the new request.
+        """
         require_authenticated(request)
         if not request.user.has_perm("access.add_accessrequest"):
             raise HttpError(403, "Forbidden")
@@ -116,7 +128,11 @@ def build_router() -> Router:
 
     @router.get("/{request_id}", response=AccessRequestOut)
     def get_request(request: HttpRequest, request_id: int):
-        """Get an access request if permitted."""
+        """Get a single access request by id.
+
+        Auth: required.
+        Permissions: requires `access.view_accessrequest` on the object.
+        """
         require_authenticated(request)
         try:
             access_request = AccessRequest.objects.get(id=request_id)
@@ -128,7 +144,15 @@ def build_router() -> Router:
 
     @router.patch("/{request_id}", response=AccessRequestOut)
     def update_request(request: HttpRequest, request_id: int, payload: AccessRequestUpdateIn):
-        """Update request status or expiry (admin/operator or owner with restrictions)."""
+        """Update request status or expiry.
+
+        Auth: required.
+        Permissions: requires `access.change_accessrequest` on the object.
+        Rules:
+        - Admin/operator (global change) can set status to approved/denied/revoked/cancelled and
+          update expires_at.
+        - Non-admin can only set status to cancelled, and only while pending.
+        """
         require_authenticated(request)
         try:
             access_request = AccessRequest.objects.get(id=request_id)
@@ -171,7 +195,11 @@ def build_router() -> Router:
 
     @router.delete("/{request_id}", response={204: None})
     def delete_request(request: HttpRequest, request_id: int):
-        """Delete an access request if permitted."""
+        """Delete an access request.
+
+        Auth: required.
+        Permissions: requires `access.delete_accessrequest` on the object.
+        """
         require_authenticated(request)
         try:
             access_request = AccessRequest.objects.get(id=request_id)

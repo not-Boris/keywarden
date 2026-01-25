@@ -1,0 +1,14 @@
+{
+  "server_url": "https://keywarden.example.com",
+  "server_id": "",
+  "sync_interval_seconds": 30,
+  "log_batch_size": 500,
+  "state_dir": "/var/lib/keywarden-agent",
+  "account_policy": {
+    "username_template": "{{username}}_{{user_id}}",
+    "default_shell": "/bin/bash",
+    "admin_group": "sudo",
+    "create_home": true,
+    "lock_on_revoke": true
+  }
+}

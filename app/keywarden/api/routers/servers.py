@@ -78,21 +78,7 @@ def build_router() -> Router:
     def create_server_json(request: HttpRequest, payload: ServerCreate):
         """Create a server using JSON payload (admin only)."""
         require_perms(request, "servers.add_server")
-        server = Server.objects.create(
-            display_name=payload.display_name.strip(),
-            hostname=(payload.hostname or "").strip() or None,
-            ipv4=(payload.ipv4 or "").strip() or None,
-            ipv6=(payload.ipv6 or "").strip() or None,
-        )
-        return {
-            "id": server.id,
-            "display_name": server.display_name,
-            "hostname": server.hostname,
-            "ipv4": server.ipv4,
-            "ipv6": server.ipv6,
-            "image_url": server.image_url,
-            "initial": server.initial,
-        }
+        raise HttpError(403, "Servers are created via agent enrollment tokens.")
 
     @router.post("/upload", response=ServerOut)
     def create_server_multipart(
@@ -105,24 +91,7 @@ def build_router() -> Router:
     ):
         """Create a server with optional image upload (admin only)."""
         require_perms(request, "servers.add_server")
-        server = Server(
-            display_name=display_name.strip(),
-            hostname=(hostname or "").strip() or None,
-            ipv4=(ipv4 or "").strip() or None,
-            ipv6=(ipv6 or "").strip() or None,
-        )
-        if image:
-            server.image.save(image.name, image)  # type: ignore[arg-type]
-        server.save()
-        return {
-            "id": server.id,
-            "display_name": server.display_name,
-            "hostname": server.hostname,
-            "ipv4": server.ipv4,
-            "ipv6": server.ipv6,
-            "image_url": server.image_url,
-            "initial": server.initial,
-        }
+        raise HttpError(403, "Servers are created via agent enrollment tokens.")
 
     @router.patch("/{server_id}", response=ServerOut)
     def update_server(request: HttpRequest, server_id: int, payload: ServerUpdate):
