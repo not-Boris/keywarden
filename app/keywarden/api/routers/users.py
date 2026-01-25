@@ -9,7 +9,7 @@ from ninja import Query, Router, Schema
 from ninja.errors import HttpError
 from pydantic import EmailStr, Field
 
-from apps.core.rbac import ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER, get_user_role, require_roles, set_user_role
+from apps.core.rbac import ROLE_USER, get_user_role, require_perms, set_user_role
 
 
 class UserCreateIn(Schema):
@@ -54,7 +54,7 @@ def build_router() -> Router:
     @router.post("/", response=UserDetailOut)
     def create_user(request: HttpRequest, payload: UserCreateIn):
         """Create a user with role and password (admin or operator)."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR)
+        require_perms(request, "auth.add_user")
         User = get_user_model()
         email = payload.email.strip().lower()
         if User.objects.filter(email__iexact=email).exists():
@@ -80,7 +80,7 @@ def build_router() -> Router:
     @router.get("/", response=List[UserListOut])
     def list_users(request: HttpRequest, pagination: UsersQuery = Query(...)):
         """List users with pagination (admin or operator)."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR)
+        require_perms(request, "auth.view_user")
         User = get_user_model()
         qs = User.objects.order_by("id")[pagination.offset : pagination.offset + pagination.limit]
         return [
@@ -96,7 +96,7 @@ def build_router() -> Router:
     @router.get("/{user_id}", response=UserDetailOut)
     def get_user(request: HttpRequest, user_id: int):
         """Get user details by id (admin or operator)."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR)
+        require_perms(request, "auth.view_user")
         User = get_user_model()
         try:
             user = User.objects.get(id=user_id)
@@ -112,7 +112,7 @@ def build_router() -> Router:
     @router.patch("/{user_id}", response=UserDetailOut)
     def update_user(request: HttpRequest, user_id: int, payload: UserUpdateIn):
         """Update user fields such as role, email, or status (admin only)."""
-        require_roles(request, ROLE_ADMIN)
+        require_perms(request, "auth.change_user")
         if payload.email is None and payload.password is None and payload.role is None and payload.is_active is None:
             raise HttpError(422, {"detail": "No fields provided."})
         User = get_user_model()
@@ -146,7 +146,7 @@ def build_router() -> Router:
     @router.delete("/{user_id}", response={204: None})
     def delete_user(request: HttpRequest, user_id: int):
         """Delete a user by id (admin only)."""
-        require_roles(request, ROLE_ADMIN)
+        require_perms(request, "auth.delete_user")
         User = get_user_model()
         try:
             user = User.objects.get(id=user_id)

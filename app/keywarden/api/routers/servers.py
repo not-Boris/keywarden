@@ -7,7 +7,7 @@ from django.http import HttpRequest
 from ninja import File, Form, Router, Schema
 from ninja.files import UploadedFile
 from ninja.errors import HttpError
-from apps.core.rbac import ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER, require_roles
+from apps.core.rbac import require_perms
 from apps.servers.models import Server
 
 
@@ -41,7 +41,7 @@ def build_router() -> Router:
     @router.get("/", response=List[ServerOut])
     def list_servers(request: HttpRequest):
         """List servers visible to authenticated users."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
+        require_perms(request, "servers.view_server")
         servers = Server.objects.all()
         return [
             {
@@ -59,7 +59,7 @@ def build_router() -> Router:
     @router.get("/{server_id}", response=ServerOut)
     def get_server(request: HttpRequest, server_id: int):
         """Get server details by id."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
+        require_perms(request, "servers.view_server")
         try:
             server = Server.objects.get(id=server_id)
         except Server.DoesNotExist:
@@ -77,7 +77,7 @@ def build_router() -> Router:
     @router.post("/", response=ServerOut)
     def create_server_json(request: HttpRequest, payload: ServerCreate):
         """Create a server using JSON payload (admin only)."""
-        require_roles(request, ROLE_ADMIN)
+        require_perms(request, "servers.add_server")
         server = Server.objects.create(
             display_name=payload.display_name.strip(),
             hostname=(payload.hostname or "").strip() or None,
@@ -104,7 +104,7 @@ def build_router() -> Router:
         image: Optional[UploadedFile] = File(None),
     ):
         """Create a server with optional image upload (admin only)."""
-        require_roles(request, ROLE_ADMIN)
+        require_perms(request, "servers.add_server")
         server = Server(
             display_name=display_name.strip(),
             hostname=(hostname or "").strip() or None,
@@ -127,7 +127,7 @@ def build_router() -> Router:
     @router.patch("/{server_id}", response=ServerOut)
     def update_server(request: HttpRequest, server_id: int, payload: ServerUpdate):
         """Update server fields (admin only)."""
-        require_roles(request, ROLE_ADMIN)
+        require_perms(request, "servers.change_server")
         if (
             payload.display_name is None
             and payload.hostname is None
@@ -167,7 +167,7 @@ def build_router() -> Router:
     @router.delete("/{server_id}", response={204: None})
     def delete_server(request: HttpRequest, server_id: int):
         """Delete a server by id (admin only)."""
-        require_roles(request, ROLE_ADMIN)
+        require_perms(request, "servers.delete_server")
         try:
             server = Server.objects.get(id=server_id)
         except Server.DoesNotExist:

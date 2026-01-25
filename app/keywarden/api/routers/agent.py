@@ -9,7 +9,7 @@ from ninja import Router, Schema
 from ninja.errors import HttpError
 from pydantic import Field
 
-from apps.core.rbac import ROLE_ADMIN, ROLE_OPERATOR, require_roles
+from apps.core.rbac import require_perms
 from apps.access.models import AccessRequest
 from apps.keys.models import SSHKey
 from apps.servers.models import Server
@@ -41,7 +41,12 @@ def build_router() -> Router:
     @router.get("/servers/{server_id}/authorized-keys", response=List[AuthorizedKeyOut])
     def authorized_keys(request: HttpRequest, server_id: int):
         """Return authorized public keys for a server (admin or operator)."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR)
+        require_perms(
+            request,
+            "servers.view_server",
+            "keys.view_sshkey",
+            "access.view_accessrequest",
+        )
         try:
             server = Server.objects.get(id=server_id)
         except Server.DoesNotExist:
@@ -72,7 +77,7 @@ def build_router() -> Router:
     @router.post("/servers/{server_id}/sync-report", response=SyncReportOut)
     def sync_report(request: HttpRequest, server_id: int, payload: SyncReportIn):
         """Record an agent sync report for a server (admin or operator)."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR)
+        require_perms(request, "servers.view_server", "telemetry.add_telemetryevent")
         try:
             server = Server.objects.get(id=server_id)
         except Server.DoesNotExist:

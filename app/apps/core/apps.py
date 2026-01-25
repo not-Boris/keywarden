@@ -11,10 +11,11 @@ class CoreConfig(AppConfig):
     verbose_name = "Core"
 
     def ready(self) -> None:
-        from .rbac import ensure_role_groups
+        from .rbac import assign_role_permissions, ensure_role_groups
 
         def _ensure_roles(**_kwargs) -> None:
             ensure_role_groups()
+            assign_role_permissions()
 
-        post_migrate.connect(_ensure_roles, sender=self)
+        post_migrate.connect(_ensure_roles, dispatch_uid="core_rbac")
         return super().ready()

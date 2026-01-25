@@ -24,6 +24,7 @@ CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 
 INSTALLED_APPS = [
+    "unfold.contrib.guardian",
     "unfold",               # Admin UI
     "unfold.contrib.filters",
     "django.contrib.admin",
@@ -32,14 +33,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "guardian",
     "rest_framework",
     "apps.audit",
     "apps.accounts",
     "apps.core.apps.CoreConfig",
     "apps.dashboard",
-    "apps.servers",
-    "apps.keys",
-    "apps.access",
+    "apps.servers.apps.ServersConfig",
+    "apps.keys.apps.KeysConfig",
+    "apps.access.apps.AccessConfig",
     "apps.telemetry",
     "ninja",                # Django Ninja API
     "mozilla_django_oidc",   # OIDC Client
@@ -208,6 +210,8 @@ KEYWARDEN_AUTH_MODE = AUTH_MODE
 
 if AUTH_MODE == "oidc":
     AUTHENTICATION_BACKENDS = [
+        "django.contrib.auth.backends.ModelBackend",
+        "guardian.backends.ObjectPermissionBackend",
         "mozilla_django_oidc.auth.OIDCAuthenticationBackend",
     ]
     LOGIN_URL = "/oidc/authenticate/"
@@ -215,12 +219,15 @@ else:
     # native or hybrid -> allow both, native first for precedence
     AUTHENTICATION_BACKENDS = [
         "django.contrib.auth.backends.ModelBackend",
+        "guardian.backends.ObjectPermissionBackend",
         "mozilla_django_oidc.auth.OIDCAuthenticationBackend",
     ]
     LOGIN_URL = "/accounts/login/"
 LOGOUT_URL = "/oidc/logout/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
+
+ANONYMOUS_USER_NAME = None
 
 def permission_callback(request):
     return request.user.has_perm("keywarden.change_model")

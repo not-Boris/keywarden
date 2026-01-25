@@ -1,10 +1,11 @@
 from django.contrib import admin
+from guardian.admin import GuardedModelAdmin
 from django.utils.html import format_html
 from .models import Server
 
 
 @admin.register(Server)
-class ServerAdmin(admin.ModelAdmin):
+class ServerAdmin(GuardedModelAdmin):
     list_display = ("avatar", "display_name", "hostname", "ipv4", "ipv6", "created_at")
     list_display_links = ("display_name",)
     search_fields = ("display_name", "hostname", "ipv4", "ipv6")
@@ -25,5 +26,4 @@ class ServerAdmin(admin.ModelAdmin):
             initial,
         )
     avatar.short_description = ""
-
 

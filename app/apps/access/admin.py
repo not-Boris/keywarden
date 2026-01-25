@@ -1,10 +1,11 @@
 from django.contrib import admin
+from guardian.admin import GuardedModelAdmin
 
 from .models import AccessRequest
 
 
 @admin.register(AccessRequest)
-class AccessRequestAdmin(admin.ModelAdmin):
+class AccessRequestAdmin(GuardedModelAdmin):
     list_display = (
         "id",
         "requester",

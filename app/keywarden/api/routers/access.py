@@ -5,12 +5,13 @@ from typing import List, Optional
 
 from django.http import HttpRequest
 from django.utils import timezone
+from guardian.shortcuts import get_objects_for_user
 from ninja import Query, Router, Schema
 from ninja.errors import HttpError
 from pydantic import Field
 
 from apps.access.models import AccessRequest
-from apps.core.rbac import ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER, get_user_role, require_roles
+from apps.core.rbac import require_authenticated
 from apps.servers.models import Server
 
 
@@ -59,20 +60,31 @@ def _request_to_out(access_request: AccessRequest) -> AccessRequestOut:
     )
 
 
+def _has_global_perm(request: HttpRequest, perm: str) -> bool:
+    user = request.user
+    return bool(user and user.has_perm(perm))
+
+
 def build_router() -> Router:
     router = Router()
 
     @router.get("/", response=List[AccessRequestOut])
     def list_requests(request: HttpRequest, filters: AccessQuery = Query(...)):
         """List access requests for the user, or all if admin/operator."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
-        is_admin = get_user_role(request.user) in {ROLE_ADMIN, ROLE_OPERATOR}
-        qs = AccessRequest.objects.order_by("-requested_at")
-        if is_admin:
-            if filters.requester_id:
-                qs = qs.filter(requester_id=filters.requester_id)
+        require_authenticated(request)
+        user = request.user
+        if _has_global_perm(request, "access.view_accessrequest"):
+            qs = AccessRequest.objects.all()
         else:
-            qs = qs.filter(requester=request.user)
+            qs = get_objects_for_user(
+                user,
+                "access.view_accessrequest",
+                klass=AccessRequest,
+                accept_global_perms=False,
+            )
+        qs = qs.order_by("-requested_at")
+        if filters.requester_id and _has_global_perm(request, "access.view_accessrequest"):
+            qs = qs.filter(requester_id=filters.requester_id)
         if filters.status:
             qs = qs.filter(status=filters.status)
         if filters.server_id:
@@ -83,7 +95,9 @@ def build_router() -> Router:
     @router.post("/", response=AccessRequestOut)
     def create_request(request: HttpRequest, payload: AccessRequestCreateIn):
         """Create a new access request for a server."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
+        require_authenticated(request)
+        if not request.user.has_perm("access.add_accessrequest"):
+            raise HttpError(403, "Forbidden")
         try:
             server = Server.objects.get(id=payload.server_id)
         except Server.DoesNotExist:
@@ -103,28 +117,26 @@ def build_router() -> Router:
     @router.get("/{request_id}", response=AccessRequestOut)
     def get_request(request: HttpRequest, request_id: int):
         """Get an access request if permitted."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
+        require_authenticated(request)
         try:
             access_request = AccessRequest.objects.get(id=request_id)
         except AccessRequest.DoesNotExist:
             raise HttpError(404, "Not Found")
-        is_admin = get_user_role(request.user) in {ROLE_ADMIN, ROLE_OPERATOR}
-        if not is_admin and access_request.requester_id != request.user.id:
+        if not request.user.has_perm("access.view_accessrequest", access_request):
             raise HttpError(403, "Forbidden")
         return _request_to_out(access_request)
 
     @router.patch("/{request_id}", response=AccessRequestOut)
     def update_request(request: HttpRequest, request_id: int, payload: AccessRequestUpdateIn):
         """Update request status or expiry (admin/operator or owner with restrictions)."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
+        require_authenticated(request)
         try:
             access_request = AccessRequest.objects.get(id=request_id)
         except AccessRequest.DoesNotExist:
             raise HttpError(404, "Not Found")
-        is_admin = get_user_role(request.user) in {ROLE_ADMIN, ROLE_OPERATOR}
-        is_owner = access_request.requester_id == request.user.id
-        if not is_admin and not is_owner:
+        if not request.user.has_perm("access.change_accessrequest", access_request):
             raise HttpError(403, "Forbidden")
+        is_admin = _has_global_perm(request, "access.change_accessrequest")
         if payload.status is None and payload.expires_at is None:
             raise HttpError(422, {"detail": "No fields provided."})
         if payload.expires_at is not None:
@@ -160,13 +172,12 @@ def build_router() -> Router:
     @router.delete("/{request_id}", response={204: None})
     def delete_request(request: HttpRequest, request_id: int):
         """Delete an access request if permitted."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
+        require_authenticated(request)
         try:
             access_request = AccessRequest.objects.get(id=request_id)
         except AccessRequest.DoesNotExist:
             raise HttpError(404, "Not Found")
-        is_admin = get_user_role(request.user) in {ROLE_ADMIN, ROLE_OPERATOR}
-        if not is_admin and access_request.requester_id != request.user.id:
+        if not request.user.has_perm("access.delete_accessrequest", access_request):
             raise HttpError(403, "Forbidden")
         access_request.delete()
         return 204, None

@@ -10,7 +10,7 @@ from ninja import Query, Router, Schema
 from ninja.errors import HttpError
 from pydantic import Field
 
-from apps.core.rbac import ROLE_ADMIN, ROLE_OPERATOR, require_roles
+from apps.core.rbac import require_perms
 from apps.servers.models import Server
 from apps.telemetry.models import TelemetryEvent
 
@@ -72,7 +72,7 @@ def build_router() -> Router:
     @router.get("/", response=List[TelemetryOut])
     def list_events(request: HttpRequest, filters: TelemetryQuery = Query(...)):
         """List telemetry events with filters (admin or operator)."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR)
+        require_perms(request, "telemetry.view_telemetryevent")
         qs = TelemetryEvent.objects.order_by("-created_at")
         if filters.event_type:
             qs = qs.filter(event_type=filters.event_type)
@@ -88,7 +88,7 @@ def build_router() -> Router:
     @router.post("/", response=TelemetryOut)
     def create_event(request: HttpRequest, payload: TelemetryCreateIn):
         """Create a telemetry event entry (admin or operator)."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR)
+        require_perms(request, "telemetry.add_telemetryevent")
         server = None
         if payload.server_id:
             try:
@@ -116,7 +116,7 @@ def build_router() -> Router:
     @router.get("/summary", response=TelemetrySummaryOut)
     def summary(request: HttpRequest):
         """Return a high-level telemetry summary (admin or operator)."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR)
+        require_perms(request, "telemetry.view_telemetryevent")
         totals = TelemetryEvent.objects.aggregate(
             total=Count("id"),
             success=Count("id", filter=models.Q(success=True)),

@@ -7,11 +7,12 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.http import HttpRequest
 from django.utils import timezone
+from guardian.shortcuts import get_objects_for_user
 from ninja import Query, Router, Schema
 from ninja.errors import HttpError
 from pydantic import Field
 
-from apps.core.rbac import ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER, get_user_role, require_roles
+from apps.core.rbac import require_authenticated
 from apps.keys.models import SSHKey
 
 
@@ -58,28 +59,43 @@ def _key_to_out(key: SSHKey) -> KeyOut:
     )
 
 
+def _has_global_perm(request: HttpRequest, perm: str) -> bool:
+    user = request.user
+    return bool(user and user.has_perm(perm))
+
+
 def build_router() -> Router:
     router = Router()
 
     @router.get("/", response=List[KeyOut])
     def list_keys(request: HttpRequest, filters: KeysQuery = Query(...)):
         """List SSH keys for the current user, or any user if admin/operator."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
-        is_admin = get_user_role(request.user) in {ROLE_ADMIN, ROLE_OPERATOR}
-        qs = SSHKey.objects.order_by("-created_at")
-        if is_admin:
-            if filters.user_id:
-                qs = qs.filter(user_id=filters.user_id)
+        require_authenticated(request)
+        user = request.user
+        if _has_global_perm(request, "keys.view_sshkey"):
+            qs = SSHKey.objects.all()
         else:
-            qs = qs.filter(user=request.user)
+            qs = get_objects_for_user(
+                user,
+                "keys.view_sshkey",
+                klass=SSHKey,
+                accept_global_perms=False,
+            )
+        qs = qs.order_by("-created_at")
+        if filters.user_id and _has_global_perm(request, "keys.view_sshkey"):
+            qs = qs.filter(user_id=filters.user_id)
         qs = qs[filters.offset : filters.offset + filters.limit]
         return [_key_to_out(key) for key in qs]
 
     @router.post("/", response=KeyOut)
     def create_key(request: HttpRequest, payload: KeyCreateIn):
         """Create an SSH public key for the current user (admin/operator can specify user_id)."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
-        is_admin = get_user_role(request.user) in {ROLE_ADMIN, ROLE_OPERATOR}
+        require_authenticated(request)
+        if not request.user.has_perm("keys.add_sshkey"):
+            raise HttpError(403, "Forbidden")
+        is_admin = _has_global_perm(request, "keys.add_sshkey") and _has_global_perm(
+            request, "keys.view_sshkey"
+        )
         owner = request.user
         if is_admin and payload.user_id:
             User = get_user_model()
@@ -87,6 +103,8 @@ def build_router() -> Router:
                 owner = User.objects.get(id=payload.user_id)
             except User.DoesNotExist:
                 raise HttpError(404, "User not found")
+        elif payload.user_id and payload.user_id != request.user.id:
+            raise HttpError(403, "Forbidden")
         name = (payload.name or "").strip()
         if not name:
             raise HttpError(422, {"name": ["Name cannot be empty."]})
@@ -104,26 +122,24 @@ def build_router() -> Router:
     @router.get("/{key_id}", response=KeyOut)
     def get_key(request: HttpRequest, key_id: int):
         """Get a specific SSH key if permitted."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
-        is_admin = get_user_role(request.user) in {ROLE_ADMIN, ROLE_OPERATOR}
+        require_authenticated(request)
         try:
             key = SSHKey.objects.get(id=key_id)
         except SSHKey.DoesNotExist:
             raise HttpError(404, "Not Found")
-        if not is_admin and key.user_id != request.user.id:
+        if not request.user.has_perm("keys.view_sshkey", key):
             raise HttpError(403, "Forbidden")
         return _key_to_out(key)
 
     @router.patch("/{key_id}", response=KeyOut)
     def update_key(request: HttpRequest, key_id: int, payload: KeyUpdateIn):
         """Update key name or active state if permitted."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
-        is_admin = get_user_role(request.user) in {ROLE_ADMIN, ROLE_OPERATOR}
+        require_authenticated(request)
         try:
             key = SSHKey.objects.get(id=key_id)
         except SSHKey.DoesNotExist:
             raise HttpError(404, "Not Found")
-        if not is_admin and key.user_id != request.user.id:
+        if not request.user.has_perm("keys.change_sshkey", key):
             raise HttpError(403, "Forbidden")
         if payload.name is None and payload.is_active is None:
             raise HttpError(422, {"detail": "No fields provided."})
@@ -144,13 +160,12 @@ def build_router() -> Router:
     @router.delete("/{key_id}", response={204: None})
     def delete_key(request: HttpRequest, key_id: int):
         """Revoke an SSH key if permitted (soft delete)."""
-        require_roles(request, ROLE_ADMIN, ROLE_OPERATOR, ROLE_USER)
-        is_admin = get_user_role(request.user) in {ROLE_ADMIN, ROLE_OPERATOR}
+        require_authenticated(request)
         try:
             key = SSHKey.objects.get(id=key_id)
         except SSHKey.DoesNotExist:
             raise HttpError(404, "Not Found")
-        if not is_admin and key.user_id != request.user.id:
+        if not request.user.has_perm("keys.delete_sshkey", key):
             raise HttpError(403, "Forbidden")
         if key.is_active:
             key.is_active = False

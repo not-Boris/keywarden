@@ -6,4 +6,7 @@ class ServersConfig(AppConfig):
     name = "apps.servers"
     verbose_name = "Servers"
 
+    def ready(self) -> None:
+        from . import signals  # noqa: F401
+        return super().ready()
 
