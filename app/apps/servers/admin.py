@@ -59,12 +59,11 @@ class AgentCertificateAuthorityAdmin(admin.ModelAdmin):
     list_display = ("name", "is_active", "created_at", "revoked_at")
     list_filter = ("is_active", "created_at", "revoked_at")
     search_fields = ("name", "fingerprint")
-    readonly_fields = ("fingerprint", "serial", "created_at", "revoked_at", "created_by")
+    readonly_fields = ("cert_pem", "fingerprint", "serial", "created_at", "revoked_at", "created_by")
     fields = (
         "name",
         "is_active",
         "cert_pem",
-        "key_pem",
         "fingerprint",
         "serial",
         "created_by",

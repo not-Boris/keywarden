@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import datetime, timedelta
 from typing import List, Optional
 
@@ -8,10 +6,11 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.http import HttpRequest
 from django.utils import timezone
-from ninja import Router, Schema
+from django.views.decorators.csrf import csrf_exempt
+from ninja import Body, Router, Schema
 from ninja.errors import HttpError
 from pydantic import Field
 
@@ -78,7 +77,8 @@ def build_router() -> Router:
     router = Router()
 
     @router.post("/enroll", response=AgentEnrollOut, auth=None)
-    def enroll_agent(request: HttpRequest, payload: AgentEnrollIn):
+    @csrf_exempt
+    def enroll_agent(request: HttpRequest, payload: AgentEnrollIn = Body(...)):
         """Enroll a server agent using a one-time token."""
         token_value = (payload.token or "").strip()
         if not token_value:
@@ -100,16 +100,19 @@ def build_router() -> Router:
             except ValidationError:
                 hostname = None
 
-        server = Server.objects.create(display_name=display_name, hostname=hostname)
-        token.mark_used(server)
-        token.save(update_fields=["used_at", "server"])
-
         csr = _load_csr((payload.csr_pem or "").strip())
-        cert_pem, ca_pem, fingerprint, serial = _issue_client_cert(csr, host, server.id)
-        server.agent_enrolled_at = timezone.now()
-        server.agent_cert_fingerprint = fingerprint
-        server.agent_cert_serial = serial
-        server.save(update_fields=["agent_enrolled_at", "agent_cert_fingerprint", "agent_cert_serial"])
+        try:
+            with transaction.atomic():
+                server = Server.objects.create(display_name=display_name, hostname=hostname)
+                token.mark_used(server)
+                token.save(update_fields=["used_at", "server"])
+                cert_pem, ca_pem, fingerprint, serial = _issue_client_cert(csr, host, server.id)
+                server.agent_enrolled_at = timezone.now()
+                server.agent_cert_fingerprint = fingerprint
+                server.agent_cert_serial = serial
+                server.save(update_fields=["agent_enrolled_at", "agent_cert_fingerprint", "agent_cert_serial"])
+        except IntegrityError:
+            raise HttpError(409, "Server already enrolled")
 
         return AgentEnrollOut(
             server_id=str(server.id),
@@ -153,10 +156,10 @@ def build_router() -> Router:
             for key in keys
         ]
 
-    @router.post("/servers/{server_id}/sync-report", response=SyncReportOut)
-    def sync_report(request: HttpRequest, server_id: int, payload: SyncReportIn):
+    @router.post("/servers/{server_id}/sync-report", response=SyncReportOut, auth=None)
+    @csrf_exempt
+    def sync_report(request: HttpRequest, server_id: int, payload: SyncReportIn = Body(...)):
         """Record an agent sync report for a server (admin or operator)."""
-        require_perms(request, "servers.view_server", "telemetry.add_telemetryevent")
         try:
             server = Server.objects.get(id=server_id)
         except Server.DoesNotExist:
@@ -176,7 +179,8 @@ def build_router() -> Router:
         return SyncReportOut(status="ok")
 
     @router.post("/servers/{server_id}/logs", response=LogIngestOut, auth=None)
-    def ingest_logs(request: HttpRequest, server_id: int, payload: List[LogEventIn]):
+    @csrf_exempt
+    def ingest_logs(request: HttpRequest, server_id: int, payload: List[LogEventIn] = Body(...)):
         """Accept log batches from agents (mTLS required at the edge)."""
         try:
             Server.objects.get(id=server_id)

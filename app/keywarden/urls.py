@@ -8,10 +8,11 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("oidc/", include("mozilla_django_oidc.urls")),
     path("accounts/", include("apps.accounts.urls")),
+    path("servers/", include("apps.servers.urls")),
     # API
     path("api/", ninja_api.urls),
     path("api/v1/", ninja_api_v1.urls),
     path("api/auth/jwt/create/", TokenObtainPairView.as_view(), name="jwt-create"),
     path("api/auth/jwt/refresh/", TokenRefreshView.as_view(), name="jwt-refresh"),
-    path("", RedirectView.as_view(pattern_name="accounts:login", permanent=False)),
+    path("", RedirectView.as_view(pattern_name="servers:dashboard", permanent=False)),
 ]

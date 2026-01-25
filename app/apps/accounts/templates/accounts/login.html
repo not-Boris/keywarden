@@ -8,7 +8,7 @@
       <h1 class="mb-6 text-xl font-semibold tracking-tight text-gray-900">Sign in</h1>
       <form method="post" class="space-y-4">
         {% csrf_token %}
-        <input type="hidden" name="next" value="{% url 'accounts:profile' %}">
+        <input type="hidden" name="next" value="{% url 'servers:dashboard' %}">
         <div class="space-y-1.5">
           <label class="block text-sm font-medium text-gray-700">Username</label>
           <input type="text" name="username" autocomplete="username" required class="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-600 focus:ring-purple-600">
@@ -35,4 +35,3 @@
     </div>
   </div>
 {% endblock %}
-

@@ -226,7 +226,7 @@ else:
     ]
     LOGIN_URL = "/accounts/login/"
 LOGOUT_URL = "/oidc/logout/"
-LOGIN_REDIRECT_URL = "/"
+LOGIN_REDIRECT_URL = "/servers/"
 LOGOUT_REDIRECT_URL = "/"
 
 ANONYMOUS_USER_NAME = None

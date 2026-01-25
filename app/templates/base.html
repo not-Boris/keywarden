@@ -19,6 +19,7 @@
           </a>
           <nav class="flex items-center gap-4">
             {% if request.user.is_authenticated %}
+              <a href="{% url 'servers:dashboard' %}" class="text-sm font-medium text-gray-700 hover:text-purple-700">Servers</a>
               <a href="{% url 'accounts:profile' %}" class="text-sm font-medium text-gray-700 hover:text-purple-700">Profile</a>
               <a href="{% url 'accounts:logout' %}" class="inline-flex items-center rounded-md bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600">Logout</a>
             {% else %}
@@ -41,5 +42,4 @@
     </div>
   </body>
   </html>
-
 
