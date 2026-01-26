@@ -13,3 +13,13 @@ Authentication:
 Notes:
 - Base URL for v1 endpoints is `/api/v1`.
 - Admin-only routes return `403 Forbidden` when the token user is not staff/superuser.
+
+Example: update server display name (admin-only)
+
+PATCH `/api/v1/servers/{server_id}`
+
+```json
+{
+  "display_name": "Keywarden Prod"
+}
+```

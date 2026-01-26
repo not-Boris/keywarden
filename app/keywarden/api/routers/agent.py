@@ -6,6 +6,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import validate_ipv4_address, validate_ipv6_address
 from django.db import IntegrityError, models, transaction
 from django.http import HttpRequest
 from django.utils import timezone
@@ -44,6 +45,8 @@ class AgentEnrollIn(Schema):
     token: str
     csr_pem: str
     host: Optional[str] = None
+    ipv4: Optional[str] = None
+    ipv6: Optional[str] = None
 
 
 class AgentEnrollOut(Schema):
@@ -73,6 +76,12 @@ class LogIngestOut(Schema):
     accepted: int
 
 
+class AgentHeartbeatIn(Schema):
+    host: Optional[str] = None
+    ipv4: Optional[str] = None
+    ipv6: Optional[str] = None
+
+
 def build_router() -> Router:
     router = Router()
 
@@ -99,11 +108,18 @@ def build_router() -> Router:
                 hostname = host
             except ValidationError:
                 hostname = None
+        ipv4 = _normalize_ip(payload.ipv4, 4)
+        ipv6 = _normalize_ip(payload.ipv6, 6)
 
         csr = _load_csr((payload.csr_pem or "").strip())
         try:
             with transaction.atomic():
-                server = Server.objects.create(display_name=display_name, hostname=hostname)
+                server = Server.objects.create(
+                    display_name=display_name,
+                    hostname=hostname,
+                    ipv4=ipv4,
+                    ipv6=ipv6,
+                )
                 token.mark_used(server)
                 token.save(update_fields=["used_at", "server"])
                 cert_pem, ca_pem, fingerprint, serial = _issue_client_cert(csr, host, server.id)
@@ -189,6 +205,38 @@ def build_router() -> Router:
         # TODO: enqueue to Valkey and persist to SQLite slices.
         return LogIngestOut(status="accepted", accepted=len(payload))
 
+    @router.post("/servers/{server_id}/heartbeat", response=SyncReportOut, auth=None)
+    @csrf_exempt
+    def heartbeat(request: HttpRequest, server_id: int, payload: AgentHeartbeatIn = Body(...)):
+        """Update server host metadata (mTLS required at the edge)."""
+        try:
+            server = Server.objects.get(id=server_id)
+        except Server.DoesNotExist:
+            raise HttpError(404, "Server not found")
+        updates: dict[str, str] = {}
+        host = (payload.host or "").strip()[:253]
+        if host:
+            try:
+                hostname_validator(host)
+                if server.hostname != host:
+                    updates["hostname"] = host
+            except ValidationError:
+                pass
+        ipv4 = _normalize_ip(payload.ipv4, 4)
+        if ipv4 and server.ipv4 != ipv4:
+            updates["ipv4"] = ipv4
+        ipv6 = _normalize_ip(payload.ipv6, 6)
+        if ipv6 and server.ipv6 != ipv6:
+            updates["ipv6"] = ipv6
+        if updates:
+            for field, value in updates.items():
+                setattr(server, field, value)
+            try:
+                server.save(update_fields=list(updates.keys()))
+            except IntegrityError:
+                raise HttpError(409, "Server address already in use")
+        return SyncReportOut(status="ok")
+
     return router
 
 
@@ -248,6 +296,19 @@ def _issue_client_cert(
     fingerprint = cert.fingerprint(hashes.SHA256()).hex()
     serial = format(cert.serial_number, "x")
     return cert_pem, ca_pem, fingerprint, serial
+
+
+def _normalize_ip(value: Optional[str], version: int) -> Optional[str]:
+    if not value:
+        return None
+    try:
+        if version == 4:
+            validate_ipv4_address(value)
+        else:
+            validate_ipv6_address(value)
+    except ValidationError:
+        return None
+    return value
 
 
 router = build_router()

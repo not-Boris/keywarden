@@ -32,13 +32,18 @@ func New(cfg *config.Config) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load client cert: %w", err)
 	}
-	caData, err := os.ReadFile(cfg.CACertPath())
-	if err != nil {
-		return nil, fmt.Errorf("read ca cert: %w", err)
+	caPool, err := x509.SystemCertPool()
+	if err != nil || caPool == nil {
+		caPool = x509.NewCertPool()
 	}
-	caPool := x509.NewCertPool()
-	if !caPool.AppendCertsFromPEM(caData) {
-		return nil, errors.New("parse ca cert")
+	if cfg.ServerCAPath != "" {
+		caData, err := os.ReadFile(cfg.ServerCAPath)
+		if err != nil {
+			return nil, fmt.Errorf("read server ca cert: %w", err)
+		}
+		if !caPool.AppendCertsFromPEM(caData) {
+			return nil, errors.New("parse server ca cert")
+		}
 	}
 
 	tlsConfig := &tls.Config{
@@ -63,14 +68,16 @@ type EnrollRequest struct {
 	Token   string `json:"token"`
 	CSRPEM  string `json:"csr_pem"`
 	Host    string `json:"host"`
+	IPv4    string `json:"ipv4,omitempty"`
+	IPv6    string `json:"ipv6,omitempty"`
 	AgentID string `json:"agent_id,omitempty"`
 }
 
 type EnrollResponse struct {
-	ServerID     string `json:"server_id"`
+	ServerID    string `json:"server_id"`
 	ClientCert  string `json:"client_cert_pem"`
 	CACert      string `json:"ca_cert_pem"`
-	SyncProfile  string `json:"sync_profile,omitempty"`
+	SyncProfile string `json:"sync_profile,omitempty"`
 	DisplayName string `json:"display_name,omitempty"`
 }
 
@@ -126,7 +133,34 @@ func (c *Client) SendLogBatch(ctx context.Context, serverID string, payload []by
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("log batch failed: status %s", resp.Status)
+		return &HTTPStatusError{StatusCode: resp.StatusCode, Status: resp.Status}
+	}
+	return nil
+}
+
+type HeartbeatRequest struct {
+	Host string `json:"host,omitempty"`
+	IPv4 string `json:"ipv4,omitempty"`
+	IPv6 string `json:"ipv6,omitempty"`
+}
+
+func (c *Client) UpdateHost(ctx context.Context, serverID string, reqBody HeartbeatRequest) error {
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("encode host update: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/agent/servers/"+serverID+"/heartbeat", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("build host update: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("send host update: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return &HTTPStatusError{StatusCode: resp.StatusCode, Status: resp.Status}
 	}
 	return nil
 }

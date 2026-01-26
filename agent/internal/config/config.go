@@ -29,6 +29,7 @@ type AccountPolicy struct {
 type Config struct {
 	ServerURL           string        `json:"server_url"`
 	ServerID            string        `json:"server_id,omitempty"`
+	ServerCAPath        string        `json:"server_ca_path,omitempty"`
 	SyncIntervalSeconds int           `json:"sync_interval_seconds,omitempty"`
 	LogBatchSize        int           `json:"log_batch_size,omitempty"`
 	StateDir            string        `json:"state_dir,omitempty"`
@@ -47,7 +48,7 @@ func LoadOrInit(path string, serverURL string) (*Config, error) {
 		if serverURL == "" {
 			return nil, errors.New("server url required for first boot")
 		}
-		cfg := &Config{ServerURL: serverURL}
+		cfg := &Config{ServerURL: serverURL, ServerCAPath: os.Getenv("KEYWARDEN_SERVER_CA_PATH")}
 		applyDefaults(cfg)
 		if err := validate(cfg, false); err != nil {
 			return nil, err
@@ -60,6 +61,9 @@ func LoadOrInit(path string, serverURL string) (*Config, error) {
 	cfg := &Config{}
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
+	}
+	if cfg.ServerCAPath == "" {
+		cfg.ServerCAPath = os.Getenv("KEYWARDEN_SERVER_CA_PATH")
 	}
 	applyDefaults(cfg)
 	if err := validate(cfg, false); err != nil {

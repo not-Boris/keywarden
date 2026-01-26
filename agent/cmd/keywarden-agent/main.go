@@ -18,6 +18,7 @@ import (
 
 	"keywarden/agent/internal/client"
 	"keywarden/agent/internal/config"
+	"keywarden/agent/internal/host"
 	"keywarden/agent/internal/logs"
 	"keywarden/agent/internal/version"
 )
@@ -74,11 +75,22 @@ func main() {
 }
 
 func runOnce(ctx context.Context, apiClient *client.Client, cfg *config.Config) {
+	if err := reportHost(ctx, apiClient, cfg); err != nil {
+		if client.IsRetriable(err) {
+			log.Printf("host update deferred; will retry: %v", err)
+		} else {
+			log.Printf("host update error: %v", err)
+		}
+	}
 	if err := apiClient.SyncAccounts(ctx, cfg.ServerID); err != nil {
 		log.Printf("sync accounts error: %v", err)
 	}
 	if err := shipLogs(ctx, apiClient, cfg); err != nil {
-		log.Printf("log shipping error: %v", err)
+		if client.IsRetriable(err) {
+			log.Printf("log shipping deferred; will retry: %v", err)
+		} else {
+			log.Printf("log shipping error: %v", err)
+		}
 	}
 }
 
@@ -94,7 +106,9 @@ func ensureDirs(cfg *config.Config) error {
 
 func shipLogs(ctx context.Context, apiClient *client.Client, cfg *config.Config) error {
 	send := func(payload []byte) error {
-		return apiClient.SendLogBatch(ctx, cfg.ServerID, payload)
+		return retry(ctx, []time.Duration{250 * time.Millisecond, time.Second, 2 * time.Second}, func() error {
+			return apiClient.SendLogBatch(ctx, cfg.ServerID, payload)
+		})
 	}
 	if err := logs.DrainSpool(cfg.LogSpoolDir(), send); err != nil {
 		return err
@@ -128,6 +142,17 @@ func shipLogs(ctx context.Context, apiClient *client.Client, cfg *config.Config)
 	return nil
 }
 
+func reportHost(ctx context.Context, apiClient *client.Client, cfg *config.Config) error {
+	info := host.Detect()
+	return retry(ctx, []time.Duration{250 * time.Millisecond, time.Second, 2 * time.Second}, func() error {
+		return apiClient.UpdateHost(ctx, cfg.ServerID, client.HeartbeatRequest{
+			Host: info.Hostname,
+			IPv4: info.IPv4,
+			IPv6: info.IPv6,
+		})
+	})
+}
+
 func pickServerURL(flagValue string) string {
 	if flagValue != "" {
 		return flagValue
@@ -159,11 +184,14 @@ func bootstrapIfNeeded(cfg *config.Config, configPath string, enrollToken string
 	if err != nil {
 		return err
 	}
-	hostname, _ := os.Hostname()
+	info := host.Detect()
+	hostname := info.Hostname
 	resp, err := client.Enroll(context.Background(), cfg.ServerURL, client.EnrollRequest{
 		Token:  enrollToken,
 		CSRPEM: csrPEM,
 		Host:   hostname,
+		IPv4:   info.IPv4,
+		IPv6:   info.IPv6,
 	})
 	if err != nil {
 		return err
@@ -179,6 +207,28 @@ func bootstrapIfNeeded(cfg *config.Config, configPath string, enrollToken string
 		return err
 	}
 	return nil
+}
+
+func retry(ctx context.Context, delays []time.Duration, fn func() error) error {
+	var lastErr error
+	for attempt := 0; attempt <= len(delays); attempt++ {
+		if attempt > 0 {
+			if !client.IsRetriable(lastErr) {
+				return lastErr
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delays[attempt-1]):
+			}
+		}
+		if err := fn(); err != nil {
+			lastErr = err
+			continue
+		}
+		return nil
+	}
+	return lastErr
 }
 
 func generateKey(path string) error {
