@@ -19,6 +19,9 @@ from apps.access.permissions import sync_server_view_perm
 class AccessRequestCreateIn(Schema):
     server_id: int
     reason: Optional[str] = None
+    request_shell: bool = False
+    request_logs: bool = False
+    request_users: bool = False
     expires_at: Optional[datetime] = None
 
 
@@ -33,6 +36,9 @@ class AccessRequestOut(Schema):
     server_id: int
     status: str
     reason: str
+    request_shell: bool
+    request_logs: bool
+    request_users: bool
     requested_at: str
     decided_at: Optional[str] = None
     expires_at: Optional[str] = None
@@ -54,6 +60,9 @@ def _request_to_out(access_request: AccessRequest) -> AccessRequestOut:
         server_id=access_request.server_id,
         status=access_request.status,
         reason=access_request.reason or "",
+        request_shell=access_request.request_shell,
+        request_logs=access_request.request_logs,
+        request_users=access_request.request_users,
         requested_at=access_request.requested_at.isoformat(),
         decided_at=access_request.decided_at.isoformat() if access_request.decided_at else None,
         expires_at=access_request.expires_at.isoformat() if access_request.expires_at else None,
@@ -123,6 +132,9 @@ def build_router() -> Router:
             requester=request.user,
             server=server,
             reason=(payload.reason or "").strip(),
+            request_shell=payload.request_shell,
+            request_logs=payload.request_logs,
+            request_users=payload.request_users,
         )
         if payload.expires_at:
             access_request.expires_at = payload.expires_at

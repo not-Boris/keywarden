@@ -5,11 +5,9 @@ from guardian.shortcuts import assign_perm
 from ninja.errors import HttpError
 
 ROLE_ADMIN = "administrator"
-ROLE_OPERATOR = "operator"
-ROLE_AUDITOR = "auditor"
 ROLE_USER = "user"
 
-ROLE_ORDER = (ROLE_ADMIN, ROLE_OPERATOR, ROLE_AUDITOR, ROLE_USER)
+ROLE_ORDER = (ROLE_ADMIN, ROLE_USER)
 ROLE_ALL = ROLE_ORDER
 ROLE_ALIASES = {"admin": ROLE_ADMIN}
 ROLE_INPUTS = tuple(sorted(set(ROLE_ORDER) | set(ROLE_ALIASES.keys())))
@@ -20,21 +18,7 @@ def _model_perms(app_label: str, model: str, actions: list[str]) -> list[str]:
 
 ROLE_PERMISSIONS = {
     ROLE_ADMIN: [],
-    ROLE_OPERATOR: [
-        *_model_perms("servers", "server", ["view"]),
-        *_model_perms("access", "accessrequest", ["add", "view", "change", "delete"]),
-        *_model_perms("keys", "sshkey", ["add", "view", "change", "delete"]),
-        *_model_perms("telemetry", "telemetryevent", ["add", "view"]),
-        *_model_perms("audit", "auditlog", ["view"]),
-        *_model_perms("audit", "auditeventtype", ["view"]),
-        *_model_perms("auth", "user", ["add", "view"]),
-    ],
-    ROLE_AUDITOR: [
-        *_model_perms("audit", "auditlog", ["view"]),
-        *_model_perms("audit", "auditeventtype", ["view"]),
-    ],
     ROLE_USER: [
-        *_model_perms("servers", "server", ["view"]),
         *_model_perms("access", "accessrequest", ["add"]),
         *_model_perms("keys", "sshkey", ["add"]),
     ],
@@ -132,9 +116,6 @@ def set_user_role(user, role: str) -> str:
     if canonical == ROLE_ADMIN:
         user.is_staff = True
         user.is_superuser = True
-    elif canonical in {ROLE_OPERATOR, ROLE_AUDITOR}:
-        user.is_staff = True
-        user.is_superuser = False
     else:
         user.is_staff = False
         user.is_superuser = False

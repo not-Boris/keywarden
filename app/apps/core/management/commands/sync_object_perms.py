@@ -20,7 +20,6 @@ class Command(BaseCommand):
                 for perm in (
                     "access.view_accessrequest",
                     "access.change_accessrequest",
-                    "access.delete_accessrequest",
                 ):
                     assign_perm(perm, access_request.requester, access_request)
                 assign_default_object_permissions(access_request)

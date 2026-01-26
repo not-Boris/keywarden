@@ -16,3 +16,22 @@ Revocation:
 - Keywarden removes key / cert from target server, or invalidates on Keywarden's side
 - Keywarden removes object permissions
 - User cannot access server anymore
+
+
+Permissions:
+
+Administrator:
+- Everything
+
+Auditor:
+- Can exclusively view audit logs of servers they have access to via request.
+
+User:
+
+
+
+Access Requests:
+
+- Can use Shell?
+- Can view logs?
+- Can have user account?

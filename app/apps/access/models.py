@@ -28,6 +28,9 @@ class AccessRequest(models.Model):
         max_length=16, choices=Status.choices, default=Status.PENDING, db_index=True
     )
     reason = models.TextField(blank=True)
+    request_shell = models.BooleanField(default=False)
+    request_logs = models.BooleanField(default=False)
+    request_users = models.BooleanField(default=False)
     requested_at = models.DateTimeField(default=timezone.now, editable=False)
     decided_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
@@ -42,6 +45,7 @@ class AccessRequest(models.Model):
     class Meta:
         verbose_name = "Access request"
         verbose_name_plural = "Access requests"
+        default_permissions = ("add", "view", "change")
         indexes = [
             models.Index(fields=["status", "requested_at"], name="acc_req_status_req_idx"),
             models.Index(fields=["server", "status"], name="acc_req_server_status_idx"),

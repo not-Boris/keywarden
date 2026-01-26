@@ -16,11 +16,7 @@ def assign_access_request_perms(sender, instance: AccessRequest, created: bool, 
         return
     if instance.requester_id:
         user = instance.requester
-        for perm in (
-            "access.view_accessrequest",
-            "access.change_accessrequest",
-            "access.delete_accessrequest",
-        ):
+        for perm in ("access.view_accessrequest", "access.change_accessrequest"):
             assign_perm(perm, user, instance)
     assign_default_object_permissions(instance)
     sync_server_view_perm(instance)
