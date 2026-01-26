@@ -47,7 +47,14 @@ def build_router() -> Router:
 
     @router.get("/event-types", response=List[AuditEventTypeSchema])
     def list_event_types(request: HttpRequest):
-        """List audit event types and their default severity."""
+        """List audit event types used by the platform audit log.
+
+        Auth: required.
+        Permissions: requires global `audit.view_auditeventtype`.
+        Behavior: returns the canonical event taxonomy (key, title, severity).
+        Rationale: the admin UI and audit filters use this to map log entries
+        to human-readable categories and severity defaults.
+        """
         require_perms(request, "audit.view_auditeventtype")
         qs: QuerySet[AuditEventType] = AuditEventType.objects.all()
         return [
@@ -63,7 +70,16 @@ def build_router() -> Router:
 
     @router.get("/logs", response=List[AuditLogSchema])
     def list_logs(request: HttpRequest, filters: LogsQuery = Query(...)):
-        """List audit logs with optional filters and pagination."""
+        """List application audit log entries with filters and pagination.
+
+        Auth: required.
+        Permissions: requires global `audit.view_auditlog`.
+        Filters: severity, actor_id, event_type_key, source.
+        Pagination: limit + offset.
+        Scope: this is the Keywarden app audit trail (who changed what), not
+        the server OS log ingestion stream stored by the agent.
+        Rationale: used by the audit UI and for administrative forensics.
+        """
         require_perms(request, "audit.view_auditlog")
         qs: QuerySet[AuditLog] = AuditLog.objects.select_related("event_type", "actor").all()
         if filters.severity:

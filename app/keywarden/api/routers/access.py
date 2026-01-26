@@ -78,6 +78,7 @@ def build_router() -> Router:
         - If user has global `access.view_accessrequest`, returns all requests.
         - Otherwise, returns only objects with `access.view_accessrequest` object permission.
         Filters: status, server_id, requester_id (requester_id is honored only with global view).
+        Rationale: powers the access request queue and auditing views.
         """
         require_authenticated(request)
         user = request.user
@@ -107,6 +108,9 @@ def build_router() -> Router:
         Auth: required.
         Permissions: requires global `access.add_accessrequest`.
         Side effects: grants owner object perms on the new request.
+        Behavior: creates a pending access request; it does not grant access
+        until approved. Optional expires_at defines the requested access window.
+        Rationale: this is the entry point for delegating server access.
         """
         require_authenticated(request)
         if not request.user.has_perm("access.add_accessrequest"):
@@ -133,6 +137,7 @@ def build_router() -> Router:
 
         Auth: required.
         Permissions: requires `access.view_accessrequest` on the object.
+        Rationale: used for request detail views and approval workflows.
         """
         require_authenticated(request)
         try:
@@ -153,6 +158,9 @@ def build_router() -> Router:
         - Admin/operator (global change) can set status to approved/denied/revoked/cancelled and
           update expires_at.
         - Non-admin can only set status to cancelled, and only while pending.
+        Side effects: updates object permissions for server visibility when
+        approvals or revocations occur.
+        Rationale: this is the core approval/denial path for access control.
         """
         require_authenticated(request)
         try:
@@ -194,24 +202,6 @@ def build_router() -> Router:
         access_request.save()
         sync_server_view_perm(access_request)
         return _request_to_out(access_request)
-
-    @router.delete("/{request_id}", response={204: None})
-    def delete_request(request: HttpRequest, request_id: int):
-        """Delete an access request.
-
-        Auth: required.
-        Permissions: requires `access.delete_accessrequest` on the object.
-        """
-        require_authenticated(request)
-        try:
-            access_request = AccessRequest.objects.get(id=request_id)
-        except AccessRequest.DoesNotExist:
-            raise HttpError(404, "Not Found")
-        if not request.user.has_perm("access.delete_accessrequest", access_request):
-            raise HttpError(403, "Forbidden")
-        access_request.delete()
-        sync_server_view_perm(access_request)
-        return 204, None
 
     return router
 

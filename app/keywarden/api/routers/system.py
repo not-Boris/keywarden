@@ -14,7 +14,14 @@ def build_router() -> Router:
 
     @router.get("/health", response=HealthResponse)
     def health(request) -> HealthResponse:
-        """Health check endpoint for service monitoring."""
+        """Return application liveness for internal monitoring.
+
+        Auth: required (session or JWT). This is intentionally protected to avoid
+        exposing internal status to unauthenticated callers.
+        Behavior: returns a static {"status": "ok"} if the app stack is reachable.
+        Rationale: used by uptime checks and deployments to confirm the API
+        process is running and can authenticate requests.
+        """
         require_authenticated(request)
         return {"status": "ok"}
 

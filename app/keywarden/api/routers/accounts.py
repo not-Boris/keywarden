@@ -20,7 +20,14 @@ def build_router() -> Router:
 
     @router.get("/me", response=UserSchema)
     def me(request: HttpRequest):
-        """Return the current authenticated user's profile."""
+        """Return the authenticated user's profile and role context.
+
+        Auth: required (session or JWT). Used by the UI to build navigation,
+        display the user identity, and decide which actions are enabled.
+        Fields: returns only the minimal identity and privilege flags needed
+        by the client; no secrets or permissions lists are exposed here.
+        Rationale: keeps the client-side state aligned with the session user.
+        """
         require_authenticated(request)
         user = request.user
         return {

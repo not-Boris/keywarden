@@ -88,7 +88,18 @@ def build_router() -> Router:
     @router.post("/enroll", response=AgentEnrollOut, auth=None)
     @csrf_exempt
     def enroll_agent(request: HttpRequest, payload: AgentEnrollIn = Body(...)):
-        """Enroll a server agent using a one-time token."""
+        """Enroll a server agent using a one-time enrollment token.
+
+        Auth: token only (no session/JWT); mTLS is not yet available until
+        enrollment completes.
+        Inputs: enrollment token + CSR from the agent, optional host/IP hints.
+        Behavior:
+        - Creates a Server record (agent is the source of truth for host/IP).
+        - Marks the token as used (single-use).
+        - Signs the CSR with the active Agent CA and returns client cert + CA.
+        Rationale: this is the only supported server onboarding flow. If this
+        endpoint is removed, agents cannot bootstrap mTLS credentials.
+        """
         token_value = (payload.token or "").strip()
         if not token_value:
             raise HttpError(422, "Token required")
@@ -138,7 +149,14 @@ def build_router() -> Router:
 
     @router.get("/servers/{server_id}/authorized-keys", response=List[AuthorizedKeyOut])
     def authorized_keys(request: HttpRequest, server_id: int):
-        """Return authorized public keys for a server (admin or operator)."""
+        """Resolve the effective authorized_keys list for a server.
+
+        Auth: required (admin/operator via API).
+        Permissions: requires view access to servers, keys, and access requests.
+        Behavior: combines approved access requests with active SSH keys to
+        produce the exact key list the agent should deploy to the server.
+        Rationale: this is the policy enforcement point for per-user access.
+        """
         require_perms(
             request,
             "servers.view_server",
@@ -175,7 +193,13 @@ def build_router() -> Router:
     @router.post("/servers/{server_id}/sync-report", response=SyncReportOut, auth=None)
     @csrf_exempt
     def sync_report(request: HttpRequest, server_id: int, payload: SyncReportIn = Body(...)):
-        """Record an agent sync report for a server (admin or operator)."""
+        """Record an agent sync report for a server.
+
+        Auth: mTLS expected at the edge (no session/JWT).
+        Behavior: stores a telemetry event with counts of applied/revoked keys.
+        Rationale: provides an audit trail of enforcement actions without
+        requiring full log ingestion for every sync cycle.
+        """
         try:
             server = Server.objects.get(id=server_id)
         except Server.DoesNotExist:
@@ -197,7 +221,14 @@ def build_router() -> Router:
     @router.post("/servers/{server_id}/logs", response=LogIngestOut, auth=None)
     @csrf_exempt
     def ingest_logs(request: HttpRequest, server_id: int, payload: List[LogEventIn] = Body(...)):
-        """Accept log batches from agents (mTLS required at the edge)."""
+        """Accept log batches from agents for audit collection.
+
+        Auth: mTLS expected at the edge (no session/JWT).
+        Behavior: accepts structured log events for later storage and indexing.
+        Storage: raw logs are persisted separately per-server (SQLite shards),
+        not in the primary Postgres database.
+        Rationale: this is the ingestion pipe for security audit logging.
+        """
         try:
             Server.objects.get(id=server_id)
         except Server.DoesNotExist:
@@ -208,7 +239,13 @@ def build_router() -> Router:
     @router.post("/servers/{server_id}/heartbeat", response=SyncReportOut, auth=None)
     @csrf_exempt
     def heartbeat(request: HttpRequest, server_id: int, payload: AgentHeartbeatIn = Body(...)):
-        """Update server host metadata (mTLS required at the edge)."""
+        """Update server host metadata (hostname/IPs) reported by the agent.
+
+        Auth: mTLS expected at the edge (no session/JWT).
+        Behavior: updates hostname/IPv4/IPv6 when they change (e.g., DHCP).
+        Conflict: unique constraints are enforced; conflicts return 409.
+        Rationale: keeps the server inventory accurate without manual edits.
+        """
         try:
             server = Server.objects.get(id=server_id)
         except Server.DoesNotExist:

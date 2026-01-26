@@ -76,6 +76,7 @@ def build_router() -> Router:
         - If user has global `keys.view_sshkey`, returns all keys.
         - Otherwise, returns only objects with `keys.view_sshkey` object permission.
         Filter: user_id (honored only with global view).
+        Rationale: powers the key inventory UI and lets admins audit key usage.
         """
         require_authenticated(request)
         user = request.user
@@ -104,6 +105,7 @@ def build_router() -> Router:
         - Default owner is the current user.
         - If caller has global `keys.add_sshkey` and `keys.view_sshkey`, they may specify user_id.
         Side effects: grants owner object perms on the new key.
+        Rationale: keys are the core authorization material synced to servers.
         """
         require_authenticated(request)
         if not request.user.has_perm("keys.add_sshkey"):
@@ -140,6 +142,7 @@ def build_router() -> Router:
 
         Auth: required.
         Permissions: requires `keys.view_sshkey` on the object.
+        Rationale: used by key detail views and server access debugging.
         """
         require_authenticated(request)
         try:
@@ -156,6 +159,7 @@ def build_router() -> Router:
 
         Auth: required.
         Permissions: requires `keys.change_sshkey` on the object.
+        Rationale: allows key rotation and revocation without deletion.
         """
         require_authenticated(request)
         try:
@@ -187,6 +191,7 @@ def build_router() -> Router:
         Auth: required.
         Permissions: requires `keys.delete_sshkey` on the object.
         Behavior: sets is_active false and revoked_at if key is active.
+        Rationale: removes key access while preserving auditability.
         """
         require_authenticated(request)
         try:

@@ -53,7 +53,15 @@ def build_router() -> Router:
 
     @router.post("/", response=UserDetailOut)
     def create_user(request: HttpRequest, payload: UserCreateIn):
-        """Create a user with role and password (admin or operator)."""
+        """Create a platform user and assign a Keywarden role.
+
+        Auth: required.
+        Permissions: requires `auth.add_user` (admin/operator).
+        Behavior: uses email as username, hashes the password, and assigns a
+        role which maps to Keywarden group permissions.
+        Rationale: enables automation and external admin workflows; mirrors
+        the admin UI user creation flow.
+        """
         require_perms(request, "auth.add_user")
         User = get_user_model()
         email = payload.email.strip().lower()
@@ -79,7 +87,13 @@ def build_router() -> Router:
 
     @router.get("/", response=List[UserListOut])
     def list_users(request: HttpRequest, pagination: UsersQuery = Query(...)):
-        """List users with pagination (admin or operator)."""
+        """List users for administrative visibility and access management.
+
+        Auth: required.
+        Permissions: requires `auth.view_user`.
+        Pagination: limit + offset.
+        Rationale: used by admin UI and automation to audit user access.
+        """
         require_perms(request, "auth.view_user")
         User = get_user_model()
         qs = User.objects.order_by("id")[pagination.offset : pagination.offset + pagination.limit]
@@ -95,7 +109,12 @@ def build_router() -> Router:
 
     @router.get("/{user_id}", response=UserDetailOut)
     def get_user(request: HttpRequest, user_id: int):
-        """Get user details by id (admin or operator)."""
+        """Fetch a single user record for inspection.
+
+        Auth: required.
+        Permissions: requires `auth.view_user`.
+        Rationale: used by admin detail views and automation scripts.
+        """
         require_perms(request, "auth.view_user")
         User = get_user_model()
         try:
@@ -111,7 +130,13 @@ def build_router() -> Router:
 
     @router.patch("/{user_id}", response=UserDetailOut)
     def update_user(request: HttpRequest, user_id: int, payload: UserUpdateIn):
-        """Update user fields such as role, email, or status (admin only)."""
+        """Update user identity, role, password, or activation state.
+
+        Auth: required.
+        Permissions: requires `auth.change_user` (admin).
+        Side effects: role changes update Keywarden role/group mappings.
+        Rationale: required for role delegation and account lifecycle control.
+        """
         require_perms(request, "auth.change_user")
         if payload.email is None and payload.password is None and payload.role is None and payload.is_active is None:
             raise HttpError(422, {"detail": "No fields provided."})
@@ -142,18 +167,6 @@ def build_router() -> Router:
             "role": _role_from_user(user),
             "is_active": user.is_active,
         }
-
-    @router.delete("/{user_id}", response={204: None})
-    def delete_user(request: HttpRequest, user_id: int):
-        """Delete a user by id (admin only)."""
-        require_perms(request, "auth.delete_user")
-        User = get_user_model()
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            raise HttpError(404, "Not Found")
-        user.delete()
-        return 204, None
 
     return router
 

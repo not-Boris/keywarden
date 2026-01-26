@@ -71,7 +71,13 @@ def build_router() -> Router:
 
     @router.get("/", response=List[TelemetryOut])
     def list_events(request: HttpRequest, filters: TelemetryQuery = Query(...)):
-        """List telemetry events with filters (admin or operator)."""
+        """List telemetry events emitted by the platform and agents.
+
+        Auth: required.
+        Permissions: requires `telemetry.view_telemetryevent`.
+        Filters: event_type, server_id, user_id, success.
+        Rationale: supports operational dashboards and audit-style timelines.
+        """
         require_perms(request, "telemetry.view_telemetryevent")
         qs = TelemetryEvent.objects.order_by("-created_at")
         if filters.event_type:
@@ -87,7 +93,14 @@ def build_router() -> Router:
 
     @router.post("/", response=TelemetryOut)
     def create_event(request: HttpRequest, payload: TelemetryCreateIn):
-        """Create a telemetry event entry (admin or operator)."""
+        """Create a telemetry event entry.
+
+        Auth: required.
+        Permissions: requires `telemetry.add_telemetryevent`.
+        Behavior: validates server/user references and normalizes source.
+        Rationale: used by internal automation; if external clients are not
+        expected to emit telemetry, this endpoint can be restricted further.
+        """
         require_perms(request, "telemetry.add_telemetryevent")
         server = None
         if payload.server_id:
@@ -115,7 +128,12 @@ def build_router() -> Router:
 
     @router.get("/summary", response=TelemetrySummaryOut)
     def summary(request: HttpRequest):
-        """Return a high-level telemetry summary (admin or operator)."""
+        """Return a high-level success/failure summary.
+
+        Auth: required.
+        Permissions: requires `telemetry.view_telemetryevent`.
+        Rationale: feeds dashboard widgets without pulling full event lists.
+        """
         require_perms(request, "telemetry.view_telemetryevent")
         totals = TelemetryEvent.objects.aggregate(
             total=Count("id"),

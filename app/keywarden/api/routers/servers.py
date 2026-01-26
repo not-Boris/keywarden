@@ -29,7 +29,13 @@ def build_router() -> Router:
 
     @router.get("/", response=List[ServerOut])
     def list_servers(request: HttpRequest):
-        """List servers visible to authenticated users."""
+        """List servers the caller can view.
+
+        Auth: required.
+        Permissions: requires `servers.view_server` globally or per-object.
+        Behavior: returns only servers the user can see via object perms.
+        Rationale: drives the server dashboard and access-aware navigation.
+        """
         require_perms(request, "servers.view_server")
         if request.user.has_perm("servers.view_server"):
             servers = Server.objects.all()
@@ -55,7 +61,13 @@ def build_router() -> Router:
 
     @router.get("/{server_id}", response=ServerOut)
     def get_server(request: HttpRequest, server_id: int):
-        """Get server details by id."""
+        """Get a server record by id.
+
+        Auth: required.
+        Permissions: requires `servers.view_server` globally or per-object.
+        Rationale: used by server detail views and API clients inspecting
+        server metadata (hostname/IPs populated by the agent).
+        """
         require_perms(request, "servers.view_server")
         try:
             server = Server.objects.get(id=server_id)
@@ -77,7 +89,14 @@ def build_router() -> Router:
 
     @router.patch("/{server_id}", response=ServerOut)
     def update_server(request: HttpRequest, server_id: int, payload: ServerUpdate):
-        """Update server display name (admin only)."""
+        """Update the server display name (admin only).
+
+        Auth: required.
+        Permissions: requires `servers.change_server`.
+        Behavior: only display_name is editable via API; host/IP data is owned
+        by the agent heartbeat to avoid conflicting sources of truth.
+        Rationale: allows human-friendly naming without bypassing enrollment.
+        """
         require_perms(request, "servers.change_server")
         if payload.display_name is None:
             raise HttpError(422, {"detail": "No fields provided."})

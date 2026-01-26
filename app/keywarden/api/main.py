@@ -18,15 +18,15 @@ from .routers.agent import build_router as build_agent_router
 from django.contrib.admin.views.decorators import staff_member_required
 
 def register_routers(target_api: NinjaAPI) -> None:
-    target_api.add_router("/system", build_system_router(), tags=["system"])
-    target_api.add_router("/user", build_accounts_router(), tags=["user"])
-    target_api.add_router("/audit", build_audit_router(), tags=["audit"])
-    target_api.add_router("/servers", build_servers_router(), tags=["servers"])
-    target_api.add_router("/users", build_users_router(), tags=["users"])
-    target_api.add_router("/keys", build_keys_router(), tags=["keys"])
-    target_api.add_router("/access-requests", build_access_router(), tags=["access"])
-    target_api.add_router("/telemetry", build_telemetry_router(), tags=["telemetry"])
-    target_api.add_router("/agent", build_agent_router(), tags=["agent"])
+    target_api.add_router("/system", build_system_router(), tags=["System"])
+    target_api.add_router("/user", build_accounts_router(), tags=["Account Context"])
+    target_api.add_router("/audit", build_audit_router(), tags=["Audit Logging"])
+    target_api.add_router("/servers", build_servers_router(), tags=["Servers"])
+    target_api.add_router("/users", build_users_router(), tags=["User Directory"])
+    target_api.add_router("/keys", build_keys_router(), tags=["SSH Keys"])
+    target_api.add_router("/access-requests", build_access_router(), tags=["Access Requests"])
+    target_api.add_router("/telemetry", build_telemetry_router(), tags=["Telemetry"])
+    target_api.add_router("/agent", build_agent_router(), tags=["Agent"])
 
 
 def build_api(**kwargs) -> NinjaAPI:
