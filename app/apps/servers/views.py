@@ -35,10 +35,13 @@ def dashboard(request):
     expires_map = {}
     for access in access_qs:
         expires_at = access.expires_at
-        current = expires_map.get(access.server_id)
-        if current is None or expires_at is None:
-            expires_map[access.server_id] = None
-        elif current and expires_at and expires_at > current:
+        if access.server_id not in expires_map:
+            expires_map[access.server_id] = expires_at
+            continue
+        current = expires_map[access.server_id]
+        if current is None:
+            continue
+        if expires_at is None or expires_at > current:
             expires_map[access.server_id] = expires_at
 
     servers = [

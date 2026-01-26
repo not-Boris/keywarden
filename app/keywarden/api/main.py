@@ -1,3 +1,4 @@
+import inspect
 from typing import List, Optional
 
 from ninja import NinjaAPI, Router, Schema
@@ -27,21 +28,25 @@ def register_routers(target_api: NinjaAPI) -> None:
     target_api.add_router("/agent", build_agent_router(), tags=["agent"])
 
 
-api = NinjaAPI(
+def build_api(**kwargs) -> NinjaAPI:
+    if "csrf" in inspect.signature(NinjaAPI).parameters:
+        return NinjaAPI(csrf=True, **kwargs)
+    return NinjaAPI(**kwargs)
+
+
+api = build_api(
     title="Keywarden API",
     version="1.0.0",
     description="Authenticated API for internal app use and external clients.",
     auth=[django_auth, JWTAuth()],
-    csrf=True,  # enforce CSRF for session-authenticated unsafe requests
 )
 register_routers(api)
 
-api_v1 = NinjaAPI(
+api_v1 = build_api(
     title="Keywarden API",
     version="1.0.0",
     description="Authenticated API for internal app use and external clients.",
     auth=[django_auth, JWTAuth()],
-    csrf=True,
     urls_namespace="api-v1",
 )
 register_routers(api_v1)
