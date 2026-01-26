@@ -120,8 +120,8 @@ def _sign_public_key(
         if not os.path.exists(cert_path):
             stderr = result.stderr.decode("utf-8", "ignore")
             raise RuntimeError(f"ssh-keygen output missing: {cert_path} {stderr}")
-    with open(cert_path, "r", encoding="utf-8") as handle:
-        return handle.read().strip()
+        with open(cert_path, "r", encoding="utf-8") as handle:
+            return handle.read().strip()
 
 
 def _ensure_comment(public_key: str, comment: str) -> str:

@@ -174,7 +174,7 @@
             if (!response.ok) {
               throw new Error("Certificate regeneration failed.");
             }
-            window.location.href = "/api/v1/keys/" + keyId + "/certificate";
+            window.alert("Certificate regenerated.");
           })
           .catch(function (err) {
             window.alert(err.message);

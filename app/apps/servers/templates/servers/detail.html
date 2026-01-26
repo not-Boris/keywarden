@@ -19,20 +19,35 @@
       <a href="{% url 'servers:dashboard' %}" class="text-sm font-semibold text-purple-700 hover:text-purple-800">Back to servers</a>
     </div>
 
+    <nav class="flex flex-wrap gap-2 border-b border-gray-200 pb-2 text-sm font-semibold text-gray-500">
+      <span class="rounded-full bg-purple-50 px-3 py-1 text-purple-700">Details</span>
+      <span class="rounded-full bg-gray-100 px-3 py-1 text-gray-500">Audit</span>
+      <span class="rounded-full bg-gray-100 px-3 py-1 text-gray-500">Shell</span>
+      <span class="rounded-full bg-gray-100 px-3 py-1 text-gray-500">Settings</span>
+    </nav>
+
     <section class="grid gap-4 lg:grid-cols-3">
-      <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
-        <h2 class="text-lg font-semibold text-gray-900">Access</h2>
+      <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <h2 class="text-lg font-semibold text-gray-900">Server details</h2>
         <dl class="mt-4 space-y-3 text-sm text-gray-600">
           <div class="flex items-center justify-between">
-            <dt>Access until</dt>
-            <dd class="font-medium text-gray-900">
-              {% if expires_at %}
-                {{ expires_at|date:"M j, Y H:i" }}
-              {% else %}
-                No expiry
-              {% endif %}
-            </dd>
+            <dt>Hostname</dt>
+            <dd class="font-medium text-gray-900">{{ server.hostname|default:"—" }}</dd>
           </div>
+          <div class="flex items-center justify-between">
+            <dt>IPv4</dt>
+            <dd class="font-medium text-gray-900">{{ server.ipv4|default:"—" }}</dd>
+          </div>
+          <div class="flex items-center justify-between">
+            <dt>IPv6</dt>
+            <dd class="font-medium text-gray-900">{{ server.ipv6|default:"—" }}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
+        <h2 class="text-lg font-semibold text-gray-900">Account & certificate</h2>
+        <dl class="mt-4 space-y-3 text-sm text-gray-600">
           <div class="flex items-center justify-between">
             <dt>Account name</dt>
             <dd class="font-medium text-gray-900">
@@ -77,6 +92,22 @@
               {% endif %}
             </dd>
           </div>
+        </dl>
+      </div>
+
+      <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-3">
+        <h2 class="text-lg font-semibold text-gray-900">Access</h2>
+        <dl class="mt-4 space-y-3 text-sm text-gray-600">
+          <div class="flex items-center justify-between">
+            <dt>Access until</dt>
+            <dd class="font-medium text-gray-900">
+              {% if expires_at %}
+                {{ expires_at|date:"M j, Y H:i" }}
+              {% else %}
+                No expiry
+              {% endif %}
+            </dd>
+          </div>
           <div class="flex items-center justify-between">
             <dt>Last accessed</dt>
             <dd class="font-medium text-gray-900">
@@ -86,24 +117,6 @@
                 —
               {% endif %}
             </dd>
-          </div>
-        </dl>
-      </div>
-
-      <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-gray-900">Server details</h2>
-        <dl class="mt-4 space-y-3 text-sm text-gray-600">
-          <div class="flex items-center justify-between">
-            <dt>Hostname</dt>
-            <dd class="font-medium text-gray-900">{{ server.hostname|default:"—" }}</dd>
-          </div>
-          <div class="flex items-center justify-between">
-            <dt>IPv4</dt>
-            <dd class="font-medium text-gray-900">{{ server.ipv4|default:"—" }}</dd>
-          </div>
-          <div class="flex items-center justify-between">
-            <dt>IPv6</dt>
-            <dd class="font-medium text-gray-900">{{ server.ipv6|default:"—" }}</dd>
           </div>
         </dl>
       </div>
@@ -160,7 +173,7 @@
             if (!response.ok) {
               throw new Error("Certificate regeneration failed.");
             }
-            window.location.href = "/api/v1/keys/" + keyId + "/certificate";
+            window.alert("Certificate regenerated.");
           })
           .catch(function (err) {
             window.alert(err.message);
