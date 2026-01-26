@@ -96,6 +96,19 @@ SESSION_CACHE_ALIAS = "default"
 
 KEYWARDEN_AGENT_CERT_VALIDITY_DAYS = int(os.getenv("KEYWARDEN_AGENT_CERT_VALIDITY_DAYS", "90"))
 
+CELERY_BROKER_URL = os.getenv("KEYWARDEN_CELERY_BROKER_URL", REDIS_URL)
+CELERY_RESULT_BACKEND = os.getenv("KEYWARDEN_CELERY_RESULT_BACKEND", REDIS_URL)
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "UTC"
+CELERY_BEAT_SCHEDULE = {
+    "expire-access-requests": {
+        "task": "apps.access.tasks.expire_access_requests",
+        "schedule": 60.0,
+    },
+}
+
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.Argon2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",
@@ -158,9 +171,6 @@ UNFOLD = {
         "/static/unfold/css/styles.css",
         "/static/unfold/css/simplebar.css",
         (lambda request: "/static/unfold/css/keywarden.css"),
-    ],
-    "SCRIPTS": [
-        "/static/unfold/js/simplebar.js",
     ],
     "TABS": [
         {

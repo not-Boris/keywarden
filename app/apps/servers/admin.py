@@ -1,6 +1,13 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from guardian.admin import GuardedModelAdmin
+try:
+    from unfold.contrib.guardian.admin import GuardedModelAdmin
+except ImportError:  # Fallback for older Unfold builds without guardian admin shim.
+    from guardian.admin import GuardedModelAdmin as GuardianGuardedModelAdmin
+    from unfold.admin import ModelAdmin as UnfoldModelAdmin
+
+    class GuardedModelAdmin(GuardianGuardedModelAdmin, UnfoldModelAdmin):
+        pass
 
 from .models import AgentCertificateAuthority, EnrollmentToken, Server
 

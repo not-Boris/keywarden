@@ -7,6 +7,7 @@ from django.http import HttpRequest
 from ninja import File, Form, Router, Schema
 from ninja.files import UploadedFile
 from ninja.errors import HttpError
+from guardian.shortcuts import get_objects_for_user
 from apps.core.rbac import require_perms
 from apps.servers.models import Server
 
@@ -42,7 +43,15 @@ def build_router() -> Router:
     def list_servers(request: HttpRequest):
         """List servers visible to authenticated users."""
         require_perms(request, "servers.view_server")
-        servers = Server.objects.all()
+        if request.user.has_perm("servers.view_server"):
+            servers = Server.objects.all()
+        else:
+            servers = get_objects_for_user(
+                request.user,
+                "servers.view_server",
+                klass=Server,
+                accept_global_perms=False,
+            )
         return [
             {
                 "id": s.id,
@@ -64,6 +73,10 @@ def build_router() -> Router:
             server = Server.objects.get(id=server_id)
         except Server.DoesNotExist:
             raise HttpError(404, "Not Found")
+        if not request.user.has_perm("servers.view_server", server) and not request.user.has_perm(
+            "servers.view_server"
+        ):
+            raise HttpError(403, "Forbidden")
         return {
             "id": server.id,
             "display_name": server.display_name,

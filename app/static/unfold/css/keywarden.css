@@ -83,4 +83,17 @@ html:not(.dark) .kw-pill {
 .kw-warn { color: #fdba74; }    /* orange-300 */
 .kw-bad  { color: #fca5a5; }    /* red-300 */
 
+/* Align related-object action icons with their fields in admin forms. */
+.related-widget-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
+.related-widget-wrapper select,
+.related-widget-wrapper .select2-container {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 

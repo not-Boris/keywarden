@@ -5,13 +5,25 @@ from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import render
 from django.utils import timezone
+from guardian.shortcuts import get_objects_for_user
 
 from apps.access.models import AccessRequest
+from apps.servers.models import Server
 
 
 @login_required(login_url="/accounts/login/")
 def dashboard(request):
     now = timezone.now()
+    if request.user.has_perm("servers.view_server"):
+        server_qs = Server.objects.all()
+    else:
+        server_qs = get_objects_for_user(
+            request.user,
+            "servers.view_server",
+            klass=Server,
+            accept_global_perms=False,
+        )
+
     access_qs = (
         AccessRequest.objects.select_related("server")
         .filter(
@@ -19,22 +31,24 @@ def dashboard(request):
             status=AccessRequest.Status.APPROVED,
         )
         .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
-        .order_by("-requested_at")
     )
-
-    seen = set()
-    servers = []
+    expires_map = {}
     for access in access_qs:
-        if access.server_id in seen:
-            continue
-        seen.add(access.server_id)
-        servers.append(
-            {
-                "server": access.server,
-                "expires_at": access.expires_at,
-                "last_accessed": None,
-            }
-        )
+        expires_at = access.expires_at
+        current = expires_map.get(access.server_id)
+        if current is None or expires_at is None:
+            expires_map[access.server_id] = None
+        elif current and expires_at and expires_at > current:
+            expires_map[access.server_id] = expires_at
+
+    servers = [
+        {
+            "server": server,
+            "expires_at": expires_map.get(server.id),
+            "last_accessed": None,
+        }
+        for server in server_qs
+    ]
 
     context = {
         "servers": servers,
@@ -45,9 +59,17 @@ def dashboard(request):
 @login_required(login_url="/accounts/login/")
 def detail(request, server_id: int):
     now = timezone.now()
+    try:
+        server = Server.objects.get(id=server_id)
+    except Server.DoesNotExist:
+        raise Http404("Server not found")
+    if not request.user.has_perm("servers.view_server", server) and not request.user.has_perm(
+        "servers.view_server"
+    ):
+        raise Http404("Server not found")
+
     access = (
-        AccessRequest.objects.select_related("server")
-        .filter(
+        AccessRequest.objects.filter(
             requester=request.user,
             server_id=server_id,
             status=AccessRequest.Status.APPROVED,
@@ -56,12 +78,10 @@ def detail(request, server_id: int):
         .order_by("-requested_at")
         .first()
     )
-    if not access:
-        raise Http404("Server not found")
 
     context = {
-        "server": access.server,
-        "expires_at": access.expires_at,
+        "server": server,
+        "expires_at": access.expires_at if access else None,
         "last_accessed": None,
     }
     return render(request, "servers/detail.html", context)

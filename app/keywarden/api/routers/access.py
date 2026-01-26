@@ -13,6 +13,7 @@ from pydantic import Field
 from apps.access.models import AccessRequest
 from apps.core.rbac import require_authenticated
 from apps.servers.models import Server
+from apps.access.permissions import sync_server_view_perm
 
 
 class AccessRequestCreateIn(Schema):
@@ -191,6 +192,7 @@ def build_router() -> Router:
             else:
                 access_request.decided_by = None
         access_request.save()
+        sync_server_view_perm(access_request)
         return _request_to_out(access_request)
 
     @router.delete("/{request_id}", response={204: None})
@@ -208,6 +210,7 @@ def build_router() -> Router:
         if not request.user.has_perm("access.delete_accessrequest", access_request):
             raise HttpError(403, "Forbidden")
         access_request.delete()
+        sync_server_view_perm(access_request)
         return 204, None
 
     return router
