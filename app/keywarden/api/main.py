@@ -1,7 +1,7 @@
 import inspect
 from typing import List, Optional
 
-from ninja import NinjaAPI, Router, Schema
+from ninja import NinjaAPI, Router, Schema, Redoc
 from ninja.security import django_auth
 
 from .security import JWTAuth
@@ -15,6 +15,7 @@ from .routers.access import build_router as build_access_router
 from .routers.telemetry import build_router as build_telemetry_router
 from .routers.agent import build_router as build_agent_router
 
+from django.contrib.admin.views.decorators import staff_member_required
 
 def register_routers(target_api: NinjaAPI) -> None:
     target_api.add_router("/system", build_system_router(), tags=["system"])
@@ -39,6 +40,8 @@ api = build_api(
     version="1.0.0",
     description="Authenticated API for internal app use and external clients.",
     auth=[django_auth, JWTAuth()],
+    docs=Redoc(),
+    docs_decorator=staff_member_required,
 )
 register_routers(api)
 
@@ -48,5 +51,7 @@ api_v1 = build_api(
     description="Authenticated API for internal app use and external clients.",
     auth=[django_auth, JWTAuth()],
     urls_namespace="api-v1",
+    docs=Redoc(),
+    docs_decorator=staff_member_required,
 )
 register_routers(api_v1)

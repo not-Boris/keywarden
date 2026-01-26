@@ -1,0 +1,32 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title|default:"Keywarden API" }}</title>
+    <link rel="stylesheet" href="{% static 'ninja/swagger-ui.css' %}">
+    <style>
+      .swagger-ui .opblock-summary {
+        flex-direction: row;
+        flex-wrap: nowrap;
+      }
+      .swagger-ui .opblock-summary-path {
+        max-width: none;
+        white-space: nowrap;
+        word-break: normal;
+        overflow-wrap: normal;
+        writing-mode: horizontal-tb;
+      }
+      .swagger-ui .opblock-summary-path a {
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body data-api-csrf="{{ add_csrf|yesno:'true,false' }}" data-csrf-token="{{ csrf_token }}">
+    <div id="swagger-ui"></div>
+    <script id="swagger-settings" type="application/json">{{ swagger_settings|safe }}</script>
+    <script src="{% static 'ninja/swagger-ui-bundle.js' %}"></script>
+    <script src="{% static 'ninja/swagger-ui-init.js' %}"></script>
+  </body>
+</html>
