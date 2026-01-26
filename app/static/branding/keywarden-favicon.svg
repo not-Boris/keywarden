@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Keywarden favicon">
+  <defs>
+    <linearGradient id="kw-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#140b24" />
+      <stop offset="1" stop-color="#2d1b4a" />
+    </linearGradient>
+    <linearGradient id="kw-vault" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8b5cf6" />
+      <stop offset="1" stop-color="#6d28d9" />
+    </linearGradient>
+  </defs>
+
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#kw-bg)" />
+  <rect x="10" y="10" width="44" height="44" rx="14" fill="#3b1f6b" />
+  <circle cx="32" cy="32" r="20" fill="url(#kw-vault)" />
+  <circle cx="32" cy="32" r="15" fill="none" stroke="#e9d5ff" stroke-width="2" opacity="0.85" />
+
+  <circle cx="32" cy="32" r="2.6" fill="#f5f3ff" />
+  <rect x="31.3" y="25" width="1.4" height="14" rx="0.7" fill="#f5f3ff" />
+  <rect x="25" y="31.3" width="14" height="1.4" rx="0.7" fill="#f5f3ff" />
+
+  <circle cx="32" cy="14" r="2" fill="#d9a441" />
+  <circle cx="49.1" cy="26.4" r="2" fill="#d7c24a" />
+  <circle cx="42.6" cy="46.6" r="2" fill="#9bbb3c" />
+  <circle cx="21.4" cy="46.6" r="2" fill="#4fbf7a" />
+  <circle cx="14.9" cy="26.4" r="2" fill="#35a6a1" />
+</svg>

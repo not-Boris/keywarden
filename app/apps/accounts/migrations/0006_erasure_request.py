@@ -70,6 +70,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="erasurerequest",
-            index=models.Index(fields=["user", "status"], name="accounts_erasure_user_status_idx"),
+            index=models.Index(fields=["user", "status"], name="accounts_er_user_status_idx"),
         ),
     ]

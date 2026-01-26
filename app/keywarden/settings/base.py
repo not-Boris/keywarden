@@ -3,6 +3,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from django.urls import reverse_lazy
+from django.templatetags.static import static
 from django.utils.translation import gettext_lazy as _
 
 load_dotenv()
@@ -46,7 +47,8 @@ INSTALLED_APPS = [
     "ninja",                # Django Ninja API
     "mozilla_django_oidc",   # OIDC Client
     "tailwind",
-    "theme"
+    "theme",
+    "keywarden"
 ]
 
 MIDDLEWARE = [
@@ -141,8 +143,25 @@ TEMPLATES = [
 # AUTHENTICATION_BACKENDS is configured dynamically below based on KEYWARDEN_AUTH_MODE
 
 UNFOLD = {
-    "SITE_TITLE": "Keywarden Admin",
+    "SITE_ICON": lambda request: static("branding/keywarden-favicon.svg"),
+    "SITE_LOGO": lambda request: static("branding/keywarden-favicon.svg"),
+    "SITE_TITLE": "Admin - Keywarden",
     "SITE_HEADER": "Keywarden",
+    "SITE_FAVICONS": [
+        {
+            "rel": "icon",
+            "sizes": "32x32",
+            "type": "image/svg+xml",
+            "href": lambda request: static("branding/keywarden-favicon.svg"),
+        },
+    ],
+    "SITE_DROPDOWN": [
+        {
+            "icon": "diamond",
+            "title": _("Gitea"),
+            "link": "https://git.ntbx.io/boris/keywarden",
+        },
+    ],
     "SHOW_HISTORY": True,
     "SITE_URL": "/",
     "LOGIN_REDIRECT_URL": "/admin/",
@@ -170,39 +189,39 @@ UNFOLD = {
     "STYLES": [
         "/static/unfold/css/styles.css",
         "/static/unfold/css/simplebar.css",
-        (lambda request: "/static/unfold/css/keywarden.css"),
+        #(lambda request: "/static/unfold/css/keywarden.css"),
     ],
-    "TABS": [
-        {
-            "models": [
-                "auth.User",
-            ],
-            "items": [
-                {
-                    "title": _("Logs"),
-                    "link": reverse_lazy("admin:audit_auditlog_changelist"),
-                    "attrs": {"hx-boost": "true"},
-                },
-                {
-                    "title": _("Event Types"),
-                    "link": reverse_lazy("admin:audit_auditeventtype_changelist"),
-                    "attrs": {"hx-boost": "true"},
-                },
-            ],
-        },
-        {
-            "models": [
-                "servers.Server",
-            ],
-            "items": [
-                {
-                    "title": _("Servers"),
-                    "link": reverse_lazy("admin:servers_server_changelist"),
-                    "attrs": {"hx-boost": "true"},
-                },
-            ],
-        },
-    ],    
+    # "TABS": [
+    #     {
+    #         "models": [
+    #             "auth.User",
+    #         ],
+    #         "items": [
+    #             {
+    #                 "title": _("Logs"),
+    #                 "link": reverse_lazy("admin:audit_auditlog_changelist"),
+    #                 "attrs": {"hx-boost": "true"},
+    #             },
+    #             {
+    #                 "title": _("Event Types"),
+    #                 "link": reverse_lazy("admin:audit_auditeventtype_changelist"),
+    #                 "attrs": {"hx-boost": "true"},
+    #             },
+    #         ],
+    #     },
+    #     {
+    #         "models": [
+    #             "servers.Server",
+    #         ],
+    #         "items": [
+    #             {
+    #                 "title": _("Servers"),
+    #                 "link": reverse_lazy("admin:servers_server_changelist"),
+    #                 "attrs": {"hx-boost": "true"},
+    #             },
+    #         ],
+    #     },
+    # ],    
 }
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR/"media"

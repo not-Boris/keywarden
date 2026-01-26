@@ -45,7 +45,7 @@ class ErasureRequest(models.Model):
         ordering = ["-requested_at"]
         indexes = [
             models.Index(fields=["status", "requested_at"], name="accounts_erasure_status_idx"),
-            models.Index(fields=["user", "status"], name="accounts_erasure_user_status_idx"),
+            models.Index(fields=["user", "status"], name="accounts_er_user_status_idx"),
         ]
 
     def __str__(self) -> str:
