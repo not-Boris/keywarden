@@ -18,7 +18,9 @@ from pydantic import Field
 from guardian.shortcuts import get_users_with_perms
 
 from apps.core.rbac import require_perms
+from apps.keys.certificates import get_active_ca
 from apps.keys.models import SSHKey
+from apps.keys.utils import render_system_username
 from apps.servers.models import (
     AgentCertificateAuthority,
     EnrollmentToken,
@@ -46,7 +48,8 @@ class AccountAccessOut(Schema):
     user_id: int
     username: str
     email: str
-    keys: List[AccountKeyOut]
+    system_username: str
+    keys: List[AccountKeyOut] = Field(default_factory=list)
 
 
 class AccountSyncIn(Schema):
@@ -215,19 +218,29 @@ def build_router() -> Router:
         """
         server = _get_server_or_404(server_id)
         users = _resolve_access_users(server)
-        key_map = _key_map_for_users(users)
         return [
             AccountAccessOut(
                 user_id=user.id,
                 username=user.username,
                 email=user.email or "",
-                keys=[
-                    AccountKeyOut(public_key=key.public_key, fingerprint=key.fingerprint)
-                    for key in key_map.get(user.id, [])
-                ],
+                system_username=render_system_username(user.username, user.id),
+                keys=[],
             )
             for user in users
         ]
+
+    @router.get("/servers/{server_id}/ssh-ca", auth=None)
+    @csrf_exempt
+    def ssh_ca(request: HttpRequest, server_id: int):
+        """Return the active SSH user CA public key for agents.
+
+        Auth: mTLS expected at the edge (no session/JWT).
+        """
+        _ = _get_server_or_404(server_id)
+        ca = get_active_ca()
+        if not ca.public_key:
+            raise HttpError(404, "SSH CA not configured")
+        return {"public_key": ca.public_key, "fingerprint": ca.fingerprint}
 
     @router.post("/servers/{server_id}/sync-report", response=SyncReportOut, auth=None)
     @csrf_exempt

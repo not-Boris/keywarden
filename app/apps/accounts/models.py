@@ -78,7 +78,7 @@ class ErasureRequest(models.Model):
         from guardian.models import UserObjectPermission
 
         from apps.access.models import AccessRequest
-        from apps.keys.models import SSHKey
+        from apps.keys.models import SSHCertificate, SSHKey
 
         user = self.user
         token = uuid.uuid4().hex
@@ -113,6 +113,7 @@ class ErasureRequest(models.Model):
         UserObjectPermission.objects.filter(user=user).delete()
 
         SSHKey.objects.filter(user=user, is_active=True).update(is_active=False, revoked_at=now)
+        SSHCertificate.objects.filter(user=user, is_active=True).update(is_active=False, revoked_at=now)
         AccessRequest.objects.filter(requester=user).update(reason="[redacted]")
         AccessRequest.objects.filter(
             requester=user,

@@ -88,10 +88,16 @@ type AccountKey struct {
 }
 
 type AccountAccess struct {
-	UserID   int          `json:"user_id"`
-	Username string       `json:"username"`
-	Email    string       `json:"email"`
-	Keys     []AccountKey `json:"keys"`
+	UserID         int          `json:"user_id"`
+	Username       string       `json:"username"`
+	Email          string       `json:"email"`
+	SystemUsername string       `json:"system_username"`
+	Keys           []AccountKey `json:"keys"`
+}
+
+type UserCAResponse struct {
+	PublicKey   string `json:"public_key"`
+	Fingerprint string `json:"fingerprint"`
 }
 
 type AccountSyncEntry struct {
@@ -145,24 +151,24 @@ func (c *Client) SyncAccounts(ctx context.Context, cfg *config.Config) error {
 	if cfg == nil {
 		return errors.New("config required for account sync")
 	}
+	ca, err := c.FetchUserCA(ctx, cfg.ServerID)
+	if err != nil {
+		return err
+	}
+	if err := accounts.EnsureCA(ca.PublicKey); err != nil {
+		return err
+	}
 	users, err := c.FetchAccountAccess(ctx, cfg.ServerID)
 	if err != nil {
 		return err
 	}
 	accessUsers := make([]accounts.AccessUser, 0, len(users))
 	for _, user := range users {
-		keys := make([]string, 0, len(user.Keys))
-		for _, key := range user.Keys {
-			if strings.TrimSpace(key.PublicKey) == "" {
-				continue
-			}
-			keys = append(keys, strings.TrimSpace(key.PublicKey))
-		}
 		accessUsers = append(accessUsers, accounts.AccessUser{
-			UserID:   user.UserID,
-			Username: user.Username,
-			Email:    user.Email,
-			Keys:     keys,
+			UserID:         user.UserID,
+			Username:       user.Username,
+			Email:          user.Email,
+			SystemUsername: user.SystemUsername,
 		})
 	}
 	result, syncErr := accounts.Sync(cfg.AccountPolicy, cfg.StateDir, accessUsers)
@@ -213,6 +219,34 @@ func (c *Client) FetchAccountAccess(ctx context.Context, serverID string) ([]Acc
 		return nil, fmt.Errorf("decode account access: %w", err)
 	}
 	return out, nil
+}
+
+func (c *Client) FetchUserCA(ctx context.Context, serverID string) (*UserCAResponse, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		c.baseURL+"/agent/servers/"+serverID+"/ssh-ca",
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build user ca request: %w", err)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch user ca: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return nil, &HTTPStatusError{StatusCode: resp.StatusCode, Status: resp.Status}
+	}
+	var out UserCAResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode user ca: %w", err)
+	}
+	if strings.TrimSpace(out.PublicKey) == "" {
+		return nil, errors.New("user ca missing public key")
+	}
+	return &out, nil
 }
 
 func (c *Client) SendSyncReport(ctx context.Context, serverID string, report SyncReportRequest) error {

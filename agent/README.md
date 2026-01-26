@@ -1,6 +1,8 @@
+TODO: Move to boris/keywarden-agent. In main repo for now for development.
+
 # keywarden-agent
 
-Minimal Go agent scaffold for Keywarden.
+Minimal Go agent for Keywarden.
 
 ## Build
 

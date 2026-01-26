@@ -8,6 +8,7 @@ from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user, get_perms
 
 from apps.access.models import AccessRequest
+from apps.keys.models import SSHKey
 from apps.servers.models import Server, ServerAccount
 
 
@@ -78,6 +79,9 @@ def detail(request, server_id: int):
     )
 
     account = ServerAccount.objects.filter(server=server, user=request.user).first()
+    active_key = (
+        SSHKey.objects.filter(user=request.user, is_active=True).order_by("-created_at").first()
+    )
     context = {
         "server": server,
         "expires_at": access.expires_at if access else None,
@@ -85,5 +89,6 @@ def detail(request, server_id: int):
         "account_present": account.is_present if account else None,
         "account_synced_at": account.last_synced_at if account else None,
         "system_username": account.system_username if account else None,
+        "certificate_key_id": active_key.id if active_key else None,
     }
     return render(request, "servers/detail.html", context)

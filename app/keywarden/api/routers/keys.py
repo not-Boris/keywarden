@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import List, Optional
 
 from django.contrib.auth import get_user_model
+import hashlib
+
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
-from django.http import HttpRequest
+from django.db import IntegrityError, transaction
+from django.http import HttpRequest, HttpResponse
 from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user
 from ninja import Query, Router, Schema
@@ -13,7 +15,8 @@ from ninja.errors import HttpError
 from pydantic import Field
 
 from apps.core.rbac import require_authenticated
-from apps.keys.models import SSHKey
+from apps.keys.certificates import issue_certificate_for_key, revoke_certificate_for_key
+from apps.keys.models import SSHCertificate, SSHKey
 
 
 class KeyCreateIn(Schema):
@@ -39,6 +42,14 @@ class KeyOut(Schema):
     revoked_at: Optional[str] = None
 
 
+class CertificateOut(Schema):
+    key_id: int
+    serial: int
+    valid_after: str
+    valid_before: str
+    principals: List[str]
+
+
 class KeysQuery(Schema):
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
@@ -57,6 +68,19 @@ def _key_to_out(key: SSHKey) -> KeyOut:
         created_at=key.created_at.isoformat(),
         revoked_at=key.revoked_at.isoformat() if key.revoked_at else None,
     )
+
+
+def _ensure_certificate(key: SSHKey, request_user) -> SSHCertificate:
+    if not key.is_active:
+        raise HttpError(409, "Key is revoked")
+    now = timezone.now()
+    try:
+        cert = key.certificate
+    except SSHCertificate.DoesNotExist:
+        return issue_certificate_for_key(key, created_by=request_user)
+    if not cert.is_active or cert.valid_before <= now:
+        return issue_certificate_for_key(key, created_by=request_user)
+    return cert
 
 
 def _has_global_perm(request: HttpRequest, perm: str) -> bool:
@@ -131,9 +155,13 @@ def build_router() -> Router:
         except ValidationError as exc:
             raise HttpError(422, {"public_key": [str(exc)]})
         try:
-            key.save()
+            with transaction.atomic():
+                key.save()
+                issue_certificate_for_key(key, created_by=request.user)
         except IntegrityError:
             raise HttpError(422, {"public_key": ["Key already exists."]})
+        except Exception as exc:
+            raise HttpError(500, {"detail": f"Certificate issuance failed: {exc}"})
         return _key_to_out(key)
 
     @router.get("/{key_id}", response=KeyOut)
@@ -152,6 +180,64 @@ def build_router() -> Router:
         if not request.user.has_perm("keys.view_sshkey", key):
             raise HttpError(403, "Forbidden")
         return _key_to_out(key)
+
+    @router.post("/{key_id}/certificate", response=CertificateOut)
+    def issue_certificate(request: HttpRequest, key_id: int):
+        """Issue or re-issue an SSH certificate for a key.
+
+        Auth: required.
+        Permissions: requires `keys.view_sshkey` on the object.
+        Rationale: allows users to download a fresh certificate as needed.
+        """
+        require_authenticated(request)
+        try:
+            key = SSHKey.objects.get(id=key_id)
+        except SSHKey.DoesNotExist:
+            raise HttpError(404, "Not Found")
+        if not request.user.has_perm("keys.view_sshkey", key):
+            raise HttpError(403, "Forbidden")
+        cert = issue_certificate_for_key(key, created_by=request.user)
+        return CertificateOut(
+            key_id=key.id,
+            serial=cert.serial,
+            valid_after=cert.valid_after.isoformat(),
+            valid_before=cert.valid_before.isoformat(),
+            principals=list(cert.principals or []),
+        )
+
+    @router.get("/{key_id}/certificate")
+    def download_certificate(request: HttpRequest, key_id: int):
+        """Download the SSH certificate for a key."""
+        require_authenticated(request)
+        try:
+            key = SSHKey.objects.get(id=key_id)
+        except SSHKey.DoesNotExist:
+            raise HttpError(404, "Not Found")
+        if not request.user.has_perm("keys.view_sshkey", key):
+            raise HttpError(403, "Forbidden")
+        cert = _ensure_certificate(key, request.user)
+        filename = f"keywarden-{key.user_id}-{key.id}-cert.pub"
+        response = HttpResponse(cert.certificate, content_type="text/plain")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+    @router.get("/{key_id}/certificate.sha256")
+    def download_certificate_hash(request: HttpRequest, key_id: int):
+        """Download the SSH certificate hash for a key."""
+        require_authenticated(request)
+        try:
+            key = SSHKey.objects.get(id=key_id)
+        except SSHKey.DoesNotExist:
+            raise HttpError(404, "Not Found")
+        if not request.user.has_perm("keys.view_sshkey", key):
+            raise HttpError(403, "Forbidden")
+        cert = _ensure_certificate(key, request.user)
+        filename = f"keywarden-{key.user_id}-{key.id}-cert.pub"
+        digest = hashlib.sha256(cert.certificate.encode("utf-8")).hexdigest()
+        payload = f"{digest}  {filename}\n"
+        response = HttpResponse(payload, content_type="text/plain")
+        response["Content-Disposition"] = f'attachment; filename="{filename}.sha256"'
+        return response
 
     @router.patch("/{key_id}", response=KeyOut)
     def update_key(request: HttpRequest, key_id: int, payload: KeyUpdateIn):
@@ -179,8 +265,13 @@ def build_router() -> Router:
             key.is_active = payload.is_active
             if payload.is_active:
                 key.revoked_at = None
+                try:
+                    issue_certificate_for_key(key, created_by=request.user)
+                except Exception as exc:
+                    raise HttpError(500, {"detail": f"Certificate issuance failed: {exc}"})
             else:
                 key.revoked_at = timezone.now()
+                revoke_certificate_for_key(key)
         key.save()
         return _key_to_out(key)
 
@@ -204,6 +295,7 @@ def build_router() -> Router:
             key.is_active = False
             key.revoked_at = timezone.now()
             key.save(update_fields=["is_active", "revoked_at"])
+            revoke_certificate_for_key(key)
         return 204, None
 
     return router

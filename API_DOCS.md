@@ -23,3 +23,25 @@ PATCH `/api/v1/servers/{server_id}`
   "display_name": "Keywarden Prod"
 }
 ```
+
+## SSH user certificates (OpenSSH CA)
+
+Keywarden signs user SSH keys with an OpenSSH certificate authority. The flow is:
+- User uploads a public key (`POST /api/v1/keys`).
+- Server signs the key using the active user CA.
+- Certificate is stored server-side and can be downloaded by the user.
+
+Endpoints:
+- `POST /api/v1/keys/{key_id}/certificate` issues (or re-issues) a certificate.
+- `GET /api/v1/keys/{key_id}/certificate` downloads the certificate.
+- `GET /api/v1/keys/{key_id}/certificate.sha256` downloads a sha256 hash file.
+
+Agent endpoints (mTLS):
+- `GET /api/v1/agent/servers/{server_id}/ssh-ca` returns the CA public key for agent install.
+- `GET /api/v1/agent/servers/{server_id}/accounts` returns account + system username (no raw keys).
+
+Configuration:
+- `KEYWARDEN_USER_CERT_VALIDITY_DAYS` controls certificate lifetime (default: 30 days).
+- `KEYWARDEN_ACCOUNT_USERNAME_TEMPLATE` controls account name derivation.
+
+Note: `ssh-keygen` must be available on the Keywarden server to sign certificates.

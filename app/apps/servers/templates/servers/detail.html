@@ -46,9 +46,35 @@
           <div class="flex items-center justify-between">
             <dt>Certificate</dt>
             <dd class="font-medium text-gray-900">
-              <span class="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-semibold text-gray-500">
-                Download coming soon
-              </span>
+              {% if certificate_key_id %}
+                <div class="flex items-center gap-2">
+                  <div class="inline-flex overflow-hidden rounded-md shadow-sm">
+                    <button
+                      type="button"
+                      class="inline-flex items-center rounded-l-md bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700"
+                      data-download-url="/api/v1/keys/{{ certificate_key_id }}/certificate"
+                    >
+                      Download
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex items-center rounded-r-md border border-l-0 border-gray-200 bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200"
+                      data-download-url="/api/v1/keys/{{ certificate_key_id }}/certificate.sha256"
+                    >
+                      Hash
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    class="inline-flex items-center rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 js-regenerate-cert"
+                    data-key-id="{{ certificate_key_id }}"
+                  >
+                    Regenerate
+                  </button>
+                </div>
+              {% else %}
+                <span class="text-xs font-semibold text-gray-500">Upload a key to download</span>
+              {% endif %}
             </dd>
           </div>
           <div class="flex items-center justify-between">
@@ -93,4 +119,62 @@
       </div>
     </section>
   </div>
+  <script>
+    (function () {
+      function getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) {
+          return parts.pop().split(";").shift();
+        }
+        return "";
+      }
+
+      function handleDownload(event) {
+        var button = event.currentTarget;
+        var url = button.getAttribute("data-download-url");
+        if (!url) {
+          return;
+        }
+        window.location.href = url;
+      }
+
+      function handleRegenerate(event) {
+        var button = event.currentTarget;
+        var keyId = button.getAttribute("data-key-id");
+        if (!keyId) {
+          return;
+        }
+        if (!window.confirm("Regenerate the certificate for this key?")) {
+          return;
+        }
+        var csrf = getCookie("csrftoken");
+        fetch("/api/v1/keys/" + keyId + "/certificate", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "X-CSRFToken": csrf,
+          },
+        })
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error("Certificate regeneration failed.");
+            }
+            window.location.href = "/api/v1/keys/" + keyId + "/certificate";
+          })
+          .catch(function (err) {
+            window.alert(err.message);
+          });
+      }
+
+      var downloadButtons = document.querySelectorAll("[data-download-url]");
+      for (var i = 0; i < downloadButtons.length; i += 1) {
+        downloadButtons[i].addEventListener("click", handleDownload);
+      }
+      var buttons = document.querySelectorAll(".js-regenerate-cert");
+      for (var j = 0; j < buttons.length; j += 1) {
+        buttons[j].addEventListener("click", handleRegenerate);
+      }
+    })();
+  </script>
 {% endblock %}

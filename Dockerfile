@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     curl \
     openssl \
+    openssh-client \
     nginx \
     nodejs \
     npm \
