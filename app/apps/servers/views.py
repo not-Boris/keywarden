@@ -5,24 +5,21 @@ from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import render
 from django.utils import timezone
-from guardian.shortcuts import get_objects_for_user
+from guardian.shortcuts import get_objects_for_user, get_perms
 
 from apps.access.models import AccessRequest
-from apps.servers.models import Server
+from apps.servers.models import Server, ServerAccount
 
 
 @login_required(login_url="/accounts/login/")
 def dashboard(request):
     now = timezone.now()
-    if request.user.has_perm("servers.view_server"):
-        server_qs = Server.objects.all()
-    else:
-        server_qs = get_objects_for_user(
-            request.user,
-            "servers.view_server",
-            klass=Server,
-            accept_global_perms=False,
-        )
+    server_qs = get_objects_for_user(
+        request.user,
+        "servers.view_server",
+        klass=Server,
+        accept_global_perms=False,
+    )
 
     access_qs = (
         AccessRequest.objects.select_related("server")
@@ -66,9 +63,7 @@ def detail(request, server_id: int):
         server = Server.objects.get(id=server_id)
     except Server.DoesNotExist:
         raise Http404("Server not found")
-    if not request.user.has_perm("servers.view_server", server) and not request.user.has_perm(
-        "servers.view_server"
-    ):
+    if "view_server" not in get_perms(request.user, server):
         raise Http404("Server not found")
 
     access = (
@@ -82,9 +77,13 @@ def detail(request, server_id: int):
         .first()
     )
 
+    account = ServerAccount.objects.filter(server=server, user=request.user).first()
     context = {
         "server": server,
         "expires_at": access.expires_at if access else None,
         "last_accessed": None,
+        "account_present": account.is_present if account else None,
+        "account_synced_at": account.last_synced_at if account else None,
+        "system_username": account.system_username if account else None,
     }
     return render(request, "servers/detail.html", context)

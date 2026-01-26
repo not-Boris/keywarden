@@ -5,20 +5,27 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_ipv4_address, validate_ipv6_address
-from django.db import IntegrityError, models, transaction
+from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from ninja import Body, Router, Schema
 from ninja.errors import HttpError
 from pydantic import Field
+from guardian.shortcuts import get_users_with_perms
 
 from apps.core.rbac import require_perms
-from apps.access.models import AccessRequest
 from apps.keys.models import SSHKey
-from apps.servers.models import AgentCertificateAuthority, EnrollmentToken, Server, hostname_validator
+from apps.servers.models import (
+    AgentCertificateAuthority,
+    EnrollmentToken,
+    Server,
+    ServerAccount,
+    hostname_validator,
+)
 from apps.telemetry.models import TelemetryEvent
 
 
@@ -30,11 +37,30 @@ class AuthorizedKeyOut(Schema):
     fingerprint: str
 
 
+class AccountKeyOut(Schema):
+    public_key: str
+    fingerprint: str
+
+
+class AccountAccessOut(Schema):
+    user_id: int
+    username: str
+    email: str
+    keys: List[AccountKeyOut]
+
+
+class AccountSyncIn(Schema):
+    user_id: int
+    system_username: str
+    present: bool
+
+
 class SyncReportIn(Schema):
     applied_count: int = Field(default=0, ge=0)
     revoked_count: int = Field(default=0, ge=0)
     message: Optional[str] = None
     metadata: dict = Field(default_factory=dict)
+    accounts: List[AccountSyncIn] = Field(default_factory=list)
 
 
 class SyncReportOut(Schema):
@@ -152,42 +178,55 @@ def build_router() -> Router:
         """Resolve the effective authorized_keys list for a server.
 
         Auth: required (admin/operator via API).
-        Permissions: requires view access to servers, keys, and access requests.
-        Behavior: combines approved access requests with active SSH keys to
-        produce the exact key list the agent should deploy to the server.
+        Permissions: requires view access to servers and keys.
+        Behavior: uses server object permissions + active SSH keys to produce
+        the exact key list the agent should deploy to the server.
         Rationale: this is the policy enforcement point for per-user access.
         """
         require_perms(
             request,
             "servers.view_server",
             "keys.view_sshkey",
-            "access.view_accessrequest",
         )
-        try:
-            server = Server.objects.get(id=server_id)
-        except Server.DoesNotExist:
-            raise HttpError(404, "Server not found")
-        now = timezone.now()
-        access_qs = AccessRequest.objects.select_related("requester").filter(
-            server=server,
-            status=AccessRequest.Status.APPROVED,
-        )
-        access_qs = access_qs.filter(models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now))
-        users = [req.requester for req in access_qs if req.requester and req.requester.is_active]
-        keys = SSHKey.objects.select_related("user").filter(
-            user__in=users,
-            is_active=True,
-            revoked_at__isnull=True,
-        )
+        server = _get_server_or_404(server_id)
+        users = _resolve_access_users(server)
+        key_map = _key_map_for_users(users)
+        output: list[AuthorizedKeyOut] = []
+        for user in users:
+            for key in key_map.get(user.id, []):
+                output.append(
+                    AuthorizedKeyOut(
+                        user_id=user.id,
+                        username=user.username,
+                        email=user.email or "",
+                        public_key=key.public_key,
+                        fingerprint=key.fingerprint,
+                    )
+                )
+        return output
+
+    @router.get("/servers/{server_id}/accounts", response=List[AccountAccessOut], auth=None)
+    def account_access(request: HttpRequest, server_id: int):
+        """List accounts that should exist on a server.
+
+        Auth: mTLS expected at the edge (no session/JWT).
+        Behavior: resolves active users with server object perms and their keys.
+        Rationale: drives agent-side account provisioning.
+        """
+        server = _get_server_or_404(server_id)
+        users = _resolve_access_users(server)
+        key_map = _key_map_for_users(users)
         return [
-            AuthorizedKeyOut(
-                user_id=key.user_id,
-                username=key.user.username,
-                email=key.user.email or "",
-                public_key=key.public_key,
-                fingerprint=key.fingerprint,
+            AccountAccessOut(
+                user_id=user.id,
+                username=user.username,
+                email=user.email or "",
+                keys=[
+                    AccountKeyOut(public_key=key.public_key, fingerprint=key.fingerprint)
+                    for key in key_map.get(user.id, [])
+                ],
             )
-            for key in keys
+            for user in users
         ]
 
     @router.post("/servers/{server_id}/sync-report", response=SyncReportOut, auth=None)
@@ -216,6 +255,8 @@ def build_router() -> Router:
                 **(payload.metadata or {}),
             },
         )
+        if payload.accounts:
+            _update_server_accounts(server, payload.accounts)
         return SyncReportOut(status="ok")
 
     @router.post("/servers/{server_id}/logs", response=LogIngestOut, auth=None)
@@ -275,6 +316,62 @@ def build_router() -> Router:
         return SyncReportOut(status="ok")
 
     return router
+
+
+def _get_server_or_404(server_id: int) -> Server:
+    try:
+        return Server.objects.get(id=server_id)
+    except Server.DoesNotExist:
+        raise HttpError(404, "Server not found")
+
+
+def _resolve_access_users(server: Server) -> list:
+    users = list(
+        get_users_with_perms(
+            server,
+            only_with_perms_in=["view_server"],
+            with_group_users=True,
+            with_superusers=False,
+        )
+    )
+    active = [user for user in users if getattr(user, "is_active", False)]
+    return sorted(active, key=lambda user: (user.username or "", user.id))
+
+
+def _key_map_for_users(users: list) -> dict[int, list[SSHKey]]:
+    if not users:
+        return {}
+    keys = SSHKey.objects.select_related("user").filter(
+        user__in=users,
+        is_active=True,
+        revoked_at__isnull=True,
+    )
+    key_map: dict[int, list[SSHKey]] = {}
+    for key in keys:
+        key_map.setdefault(key.user_id, []).append(key)
+    return key_map
+
+
+def _update_server_accounts(server: Server, accounts: list[AccountSyncIn]) -> None:
+    user_ids = {account.user_id for account in accounts}
+    if not user_ids:
+        return
+    User = get_user_model()
+    users = {user.id: user for user in User.objects.filter(id__in=user_ids)}
+    now = timezone.now()
+    for account in accounts:
+        user = users.get(account.user_id)
+        if not user:
+            continue
+        ServerAccount.objects.update_or_create(
+            server=server,
+            user=user,
+            defaults={
+                "system_username": account.system_username,
+                "is_present": account.present,
+                "last_synced_at": now,
+            },
+        )
 
 
 def _load_agent_ca() -> tuple[x509.Certificate, object, str]:

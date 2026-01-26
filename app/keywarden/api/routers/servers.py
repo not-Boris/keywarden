@@ -5,8 +5,8 @@ from typing import List, Optional
 from django.http import HttpRequest
 from ninja import Router, Schema
 from ninja.errors import HttpError
-from guardian.shortcuts import get_objects_for_user
-from apps.core.rbac import require_perms
+from guardian.shortcuts import get_objects_for_user, get_perms
+from apps.core.rbac import require_authenticated, require_perms
 from apps.servers.models import Server
 
 
@@ -32,20 +32,17 @@ def build_router() -> Router:
         """List servers the caller can view.
 
         Auth: required.
-        Permissions: requires `servers.view_server` globally or per-object.
+        Permissions: requires `servers.view_server` via object permissions.
         Behavior: returns only servers the user can see via object perms.
         Rationale: drives the server dashboard and access-aware navigation.
         """
-        require_perms(request, "servers.view_server")
-        if request.user.has_perm("servers.view_server"):
-            servers = Server.objects.all()
-        else:
-            servers = get_objects_for_user(
-                request.user,
-                "servers.view_server",
-                klass=Server,
-                accept_global_perms=False,
-            )
+        require_authenticated(request)
+        servers = get_objects_for_user(
+            request.user,
+            "servers.view_server",
+            klass=Server,
+            accept_global_perms=False,
+        )
         return [
             {
                 "id": s.id,
@@ -64,18 +61,16 @@ def build_router() -> Router:
         """Get a server record by id.
 
         Auth: required.
-        Permissions: requires `servers.view_server` globally or per-object.
+        Permissions: requires `servers.view_server` via object permissions.
         Rationale: used by server detail views and API clients inspecting
         server metadata (hostname/IPs populated by the agent).
         """
-        require_perms(request, "servers.view_server")
+        require_authenticated(request)
         try:
             server = Server.objects.get(id=server_id)
         except Server.DoesNotExist:
             raise HttpError(404, "Not Found")
-        if not request.user.has_perm("servers.view_server", server) and not request.user.has_perm(
-            "servers.view_server"
-        ):
+        if "view_server" not in get_perms(request.user, server):
             raise HttpError(403, "Forbidden")
         return {
             "id": server.id,

@@ -157,3 +157,30 @@ class AgentCertificateAuthority(models.Model):
         self.key_pem = key_pem
         self.fingerprint = cert.fingerprint(hashes.SHA256()).hex()
         self.serial = format(cert.serial_number, "x")
+
+
+class ServerAccount(models.Model):
+    server = models.ForeignKey(Server, on_delete=models.CASCADE, related_name="accounts")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="server_accounts"
+    )
+    system_username = models.CharField(max_length=128)
+    is_present = models.BooleanField(default=False, db_index=True)
+    last_synced_at = models.DateTimeField(default=timezone.now, editable=False)
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Server account"
+        verbose_name_plural = "Server accounts"
+        constraints = [
+            models.UniqueConstraint(fields=["server", "user"], name="unique_server_account")
+        ]
+        indexes = [
+            models.Index(fields=["server", "user"], name="servers_account_user_idx"),
+            models.Index(fields=["server", "is_present"], name="servers_account_present_idx"),
+        ]
+        ordering = ["server_id", "user_id"]
+
+    def __str__(self) -> str:
+        return f"{self.system_username} ({self.server_id})"

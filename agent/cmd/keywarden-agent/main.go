@@ -82,7 +82,7 @@ func runOnce(ctx context.Context, apiClient *client.Client, cfg *config.Config) 
 			log.Printf("host update error: %v", err)
 		}
 	}
-	if err := apiClient.SyncAccounts(ctx, cfg.ServerID); err != nil {
+	if err := apiClient.SyncAccounts(ctx, cfg); err != nil {
 		log.Printf("sync accounts error: %v", err)
 	}
 	if err := shipLogs(ctx, apiClient, cfg); err != nil {

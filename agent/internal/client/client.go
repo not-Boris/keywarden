@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"keywarden/agent/internal/accounts"
 	"keywarden/agent/internal/config"
 )
 
@@ -81,6 +82,32 @@ type EnrollResponse struct {
 	DisplayName string `json:"display_name,omitempty"`
 }
 
+type AccountKey struct {
+	PublicKey   string `json:"public_key"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+type AccountAccess struct {
+	UserID   int          `json:"user_id"`
+	Username string       `json:"username"`
+	Email    string       `json:"email"`
+	Keys     []AccountKey `json:"keys"`
+}
+
+type AccountSyncEntry struct {
+	UserID         int    `json:"user_id"`
+	SystemUsername string `json:"system_username"`
+	Present        bool   `json:"present"`
+}
+
+type SyncReportRequest struct {
+	AppliedCount int                `json:"applied_count"`
+	RevokedCount int                `json:"revoked_count"`
+	Message      string             `json:"message,omitempty"`
+	Metadata     map[string]any     `json:"metadata,omitempty"`
+	Accounts     []AccountSyncEntry `json:"accounts,omitempty"`
+}
+
 func Enroll(ctx context.Context, serverURL string, req EnrollRequest) (*EnrollResponse, error) {
 	baseURL := strings.TrimRight(serverURL, "/")
 	if baseURL == "" {
@@ -114,10 +141,103 @@ func Enroll(ctx context.Context, serverURL string, req EnrollRequest) (*EnrollRe
 	return &out, nil
 }
 
-func (c *Client) SyncAccounts(ctx context.Context, serverID string) error {
-	_ = ctx
-	_ = serverID
-	// TODO: call API to fetch account policy + approved access list.
+func (c *Client) SyncAccounts(ctx context.Context, cfg *config.Config) error {
+	if cfg == nil {
+		return errors.New("config required for account sync")
+	}
+	users, err := c.FetchAccountAccess(ctx, cfg.ServerID)
+	if err != nil {
+		return err
+	}
+	accessUsers := make([]accounts.AccessUser, 0, len(users))
+	for _, user := range users {
+		keys := make([]string, 0, len(user.Keys))
+		for _, key := range user.Keys {
+			if strings.TrimSpace(key.PublicKey) == "" {
+				continue
+			}
+			keys = append(keys, strings.TrimSpace(key.PublicKey))
+		}
+		accessUsers = append(accessUsers, accounts.AccessUser{
+			UserID:   user.UserID,
+			Username: user.Username,
+			Email:    user.Email,
+			Keys:     keys,
+		})
+	}
+	result, syncErr := accounts.Sync(cfg.AccountPolicy, cfg.StateDir, accessUsers)
+	report := SyncReportRequest{
+		AppliedCount: result.Applied,
+		RevokedCount: result.Revoked,
+		Accounts:     make([]AccountSyncEntry, 0, len(result.Accounts)),
+	}
+	for _, account := range result.Accounts {
+		report.Accounts = append(report.Accounts, AccountSyncEntry{
+			UserID:         account.UserID,
+			SystemUsername: account.SystemUser,
+			Present:        account.Present,
+		})
+	}
+	if syncErr != nil {
+		report.Message = syncErr.Error()
+	}
+	if err := c.SendSyncReport(ctx, cfg.ServerID, report); err != nil {
+		if syncErr != nil {
+			return fmt.Errorf("sync report failed: %w (sync error: %v)", err, syncErr)
+		}
+		return err
+	}
+	return syncErr
+}
+
+func (c *Client) FetchAccountAccess(ctx context.Context, serverID string) ([]AccountAccess, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		c.baseURL+"/agent/servers/"+serverID+"/accounts",
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build account access request: %w", err)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch account access: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return nil, &HTTPStatusError{StatusCode: resp.StatusCode, Status: resp.Status}
+	}
+	var out []AccountAccess
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode account access: %w", err)
+	}
+	return out, nil
+}
+
+func (c *Client) SendSyncReport(ctx context.Context, serverID string, report SyncReportRequest) error {
+	body, err := json.Marshal(report)
+	if err != nil {
+		return fmt.Errorf("encode sync report: %w", err)
+	}
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		c.baseURL+"/agent/servers/"+serverID+"/sync-report",
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		return fmt.Errorf("build sync report: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("send sync report: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return &HTTPStatusError{StatusCode: resp.StatusCode, Status: resp.Status}
+	}
 	return nil
 }
 
