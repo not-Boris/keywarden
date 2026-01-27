@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Settings • {{ server.display_name }} • Keywarden{% endblock %}
+
+{% block content %}
+  <div class="space-y-8">
+    {% include "servers/_header.html" %}
+
+    <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-gray-900">Settings</h2>
+        <span class="text-xs font-semibold text-gray-500">Placeholder</span>
+      </div>
+      <div class="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600">
+        Settings will appear here as server options are added.
+      </div>
+    </section>
+  </div>
+{% endblock %}

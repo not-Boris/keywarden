@@ -56,7 +56,7 @@ COPY nginx/configs/options-* /etc/nginx/
 COPY supervisor/supervisord.conf /etc/supervisor/supervisord.conf
 
 RUN python manage.py collectstatic --noinput
-RUN chmod +x /app/entrypoint.sh /app/scripts/gunicorn.sh
+RUN chmod +x /app/entrypoint.sh /app/scripts/gunicorn.sh /app/scripts/daphne.sh
 
 # =============================================
 # 5. Create users for services

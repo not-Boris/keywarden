@@ -35,6 +35,9 @@ class Server(models.Model):
         ordering = ["display_name", "hostname", "ipv4", "ipv6"]
         verbose_name = "Server"
         verbose_name_plural = "Servers"
+        permissions = [
+            ("shell_server", "Can access server shell"),
+        ]
 
     def __str__(self) -> str:
         primary = self.hostname or self.ipv4 or self.ipv6 or "unassigned"

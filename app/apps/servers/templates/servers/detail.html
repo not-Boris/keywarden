@@ -4,27 +4,7 @@
 
 {% block content %}
   <div class="space-y-8">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex items-center gap-4">
-        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-600 text-white text-xl font-semibold">
-          {{ server.initial }}
-        </div>
-        <div>
-          <h1 class="text-2xl font-semibold tracking-tight text-gray-900">{{ server.display_name }}</h1>
-          <p class="text-sm text-gray-600">
-            {{ server.hostname|default:server.ipv4|default:server.ipv6|default:"Unassigned" }}
-          </p>
-        </div>
-      </div>
-      <a href="{% url 'servers:dashboard' %}" class="text-sm font-semibold text-purple-700 hover:text-purple-800">Back to servers</a>
-    </div>
-
-    <nav class="flex flex-wrap gap-2 border-b border-gray-200 pb-2 text-sm font-semibold text-gray-500">
-      <span class="rounded-full bg-purple-50 px-3 py-1 text-purple-700">Details</span>
-      <span class="rounded-full bg-gray-100 px-3 py-1 text-gray-500">Audit</span>
-      <span class="rounded-full bg-gray-100 px-3 py-1 text-gray-500">Shell</span>
-      <span class="rounded-full bg-gray-100 px-3 py-1 text-gray-500">Settings</span>
-    </nav>
+    {% include "servers/_header.html" %}
 
     <section class="grid gap-4 lg:grid-cols-3">
       <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -55,6 +35,18 @@
                 {{ system_username }}
               {% else %}
                 Unknown
+              {% endif %}
+            </dd>
+          </div>
+          <div class="flex items-center justify-between">
+            <dt>Account status</dt>
+            <dd class="font-medium text-gray-900">
+              {% if account_present is None %}
+                Unknown
+              {% elif account_present %}
+                Present
+              {% else %}
+                Not on server
               {% endif %}
             </dd>
           </div>
@@ -119,16 +111,6 @@
             </dd>
           </div>
         </dl>
-      </div>
-    </section>
-
-    <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-gray-900">Logs</h2>
-        <span class="text-xs font-semibold text-gray-500">Placeholder</span>
-      </div>
-      <div class="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600">
-        Logs will appear here once collection is enabled for this server.
       </div>
     </section>
   </div>

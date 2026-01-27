@@ -371,7 +371,7 @@ func writeCAKeyIfChanged(key string) (bool, error) {
 
 func ensureSSHDConfig() (bool, error) {
 	content := fmt.Sprintf(
-		"TrustedUserCAKeys %s\nMatch Group %s\n    AuthorizedKeysFile none\n",
+		"TrustedUserCAKeys %s\nMatch Group %s\n    AuthorizedKeysFile none\n    PasswordAuthentication no\n    ChallengeResponseAuthentication no\n",
 		userCAPath,
 		keywardenGroup,
 	)
