@@ -6,6 +6,7 @@ from django.urls import reverse_lazy
 from django.templatetags.static import static
 from django.utils.translation import gettext_lazy as _
 
+# Load environment overrides early so settings can reference them.
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -20,6 +21,7 @@ CSRF_TRUSTED_ORIGINS = [
     if origin.strip()
 ]
 
+# Default to secure cookies and respect TLS termination headers.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
@@ -94,6 +96,7 @@ CACHES = {
     }
 }
 
+# In-memory channel layer keeps local development simple.
 CHANNEL_LAYERS = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
 }
@@ -101,6 +104,7 @@ CHANNEL_LAYERS = {
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"
 
+# Certificate validity defaults; can be tightened via env vars.
 KEYWARDEN_AGENT_CERT_VALIDITY_DAYS = int(os.getenv("KEYWARDEN_AGENT_CERT_VALIDITY_DAYS", "90"))
 KEYWARDEN_USER_CERT_VALIDITY_DAYS = int(os.getenv("KEYWARDEN_USER_CERT_VALIDITY_DAYS", "30"))
 KEYWARDEN_SHELL_CERT_VALIDITY_MINUTES = int(os.getenv("KEYWARDEN_SHELL_CERT_VALIDITY_MINUTES", "15"))
@@ -178,6 +182,7 @@ UNFOLD = {
     "ENVIRONMENT": "Keywarden",
     "ENVIRONMENT_COLOR": "#7C3AED",
     "SHOW_VIEW_ON_SITE": True,
+    # Force a consistent admin theme; disables theme switching.
     "THEME": "dark", # Force theme: "dark" or "light". Will disable theme switcher
     "SIDEBAR": {
         "show_search": True,
@@ -250,6 +255,7 @@ if AUTH_MODE not in {"native", "oidc", "hybrid"}:
 KEYWARDEN_AUTH_MODE = AUTH_MODE
 
 if AUTH_MODE == "oidc":
+    # OIDC-only: enforce identity provider logins.
     AUTHENTICATION_BACKENDS = [
         "django.contrib.auth.backends.ModelBackend",
         "guardian.backends.ObjectPermissionBackend",
@@ -271,4 +277,5 @@ LOGOUT_REDIRECT_URL = "/"
 ANONYMOUS_USER_NAME = None
 
 def permission_callback(request):
+    # Guard admin-side model changes behind a single permission check.
     return request.user.has_perm("keywarden.change_model")

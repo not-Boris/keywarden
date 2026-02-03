@@ -35,6 +35,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
         self.shell_target = ""
         self.server_id: int | None = None
 
+        # Reject unauthenticated connections before any side effects.
         user = self.scope.get("user")
         if not user or not getattr(user, "is_authenticated", False):
             await self.close(code=4401)
@@ -54,6 +55,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
         if not can_shell:
             await self.close(code=4403)
             return
+        # Resolve the per-user system account name and the best reachable host.
         system_username = await self._get_system_username(user, server)
         shell_target = server.hostname or server.ipv4 or server.ipv6
         if not system_username or not shell_target:
@@ -62,6 +64,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
         self.system_username = system_username
         self.shell_target = shell_target
 
+        # Only accept the socket after all authn/authz checks have passed.
         await self.accept()
         # Audit the WebSocket connection as an explicit, opt-in event.
         await self._audit_websocket_event(user=user, action="connect", metadata={"server_id": server.id})
@@ -96,6 +99,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data=None, bytes_data=None):
         if not self.proc or not self.proc.stdin:
             return
+        # Forward WebSocket payloads directly to the SSH subprocess stdin.
         if bytes_data is not None:
             data = bytes_data
         elif text_data is not None:
@@ -109,6 +113,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
     async def _start_ssh(self, user):
         # Generate a short-lived keypair + SSH certificate and then
         # bridge the WebSocket to an SSH subprocess.
+        # Prefer tmpfs when available so the private key never hits disk.
         temp_base = "/dev/shm" if os.path.isdir("/dev/shm") and os.access("/dev/shm", os.W_OK) else None
         self.tempdir = tempfile.TemporaryDirectory(prefix="keywarden-shell-", dir=temp_base)
         key_path, cert_path = await asyncio.to_thread(
@@ -118,6 +123,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
             self.system_username,
         )
         ssh_host = _format_ssh_host(self.shell_target)
+        # Use a locked-down, non-interactive SSH invocation suitable for websockets.
         command = [
             "ssh",
             "-tt",
@@ -154,6 +160,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
+        # Delete key material immediately after the SSH process has it open.
         for path in (key_path, cert_path, f"{key_path}.pub"):
             try:
                 os.remove(path)
@@ -166,6 +173,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
     async def _stream_output(self):
         if not self.proc or not self.proc.stdout:
             return
+        # Pump subprocess output until EOF, then close the socket.
         while True:
             chunk = await self.proc.stdout.read(4096)
             if not chunk:
@@ -228,6 +236,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
                 metadata=combined_metadata,
             )
         except Exception:
+            # Auditing is best-effort; never fail the shell session.
             return
 
 
@@ -255,6 +264,7 @@ def _generate_session_keypair(tempdir: str, user, principal: str) -> tuple[str, 
         raise RuntimeError("ssh-keygen not available") from exc
     except subprocess.CalledProcessError as exc:
         raise RuntimeError(f"ssh-keygen failed: {exc.stderr.decode('utf-8', 'ignore')}") from exc
+    # Restrict filesystem access to the private key.
     os.chmod(key_path, 0o600)
     pubkey_path = key_path + ".pub"
     with open(pubkey_path, "r", encoding="utf-8") as handle:
@@ -273,6 +283,7 @@ def _generate_session_keypair(tempdir: str, user, principal: str) -> tuple[str, 
     cert_path = key_path + "-cert.pub"
     with open(cert_path, "w", encoding="utf-8") as handle:
         handle.write(cert_text + "\n")
+    # Public cert is safe to be world-readable.
     os.chmod(cert_path, 0o644)
     return key_path, cert_path
 
