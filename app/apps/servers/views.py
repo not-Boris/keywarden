@@ -189,16 +189,18 @@ def _format_age_short(delta: timedelta) -> str:
     if seconds < 60:
         return f"{seconds}s"
     minutes = seconds // 60
+    rem_seconds = seconds % 60
     if minutes < 60:
-        return f"{minutes}m"
+        return f"{minutes}m {rem_seconds}s"
     hours = minutes // 60
+    rem_minutes = minutes % 60
     if hours < 48:
-        return f"{hours}h"
+        return f"{hours}h {rem_minutes}m {rem_seconds}s"
     days = hours // 24
     if days < 14:
-        return f"{days}d"
+        return f"{days}d {hours % 24}h"
     weeks = days // 7
-    return f"{weeks}w"
+    return f"{weeks}w {days % 7}d"
 
 
 def _build_server_status(server: Server, now):

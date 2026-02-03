@@ -144,11 +144,16 @@ func shipLogs(ctx context.Context, apiClient *client.Client, cfg *config.Config)
 
 func reportHost(ctx context.Context, apiClient *client.Client, cfg *config.Config) error {
 	info := host.Detect()
+	var pingPtr *int
+	if pingMs, err := apiClient.Ping(ctx); err == nil {
+		pingPtr = &pingMs
+	}
 	return retry(ctx, []time.Duration{250 * time.Millisecond, time.Second, 2 * time.Second}, func() error {
 		return apiClient.UpdateHost(ctx, cfg.ServerID, client.HeartbeatRequest{
-			Host: info.Hostname,
-			IPv4: info.IPv4,
-			IPv6: info.IPv6,
+			Host:   info.Hostname,
+			IPv4:   info.IPv4,
+			IPv6:   info.IPv6,
+			PingMs: pingPtr,
 		})
 	})
 }

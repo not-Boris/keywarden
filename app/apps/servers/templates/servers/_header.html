@@ -70,7 +70,7 @@
             <div class="flex items-center justify-between">
               <span class="font-semibold text-gray-500">Last heartbeat</span>
               <span class="font-medium text-gray-900">
-                {% if server_status.heartbeat_at %}{{ server_status.heartbeat_at|date:"M j, Y H:i" }}{% else %}—{% endif %}
+                {% if server_status.heartbeat_at %}{{ server_status.heartbeat_at|date:"M j, Y H:i:s" }}{% else %}—{% endif %}
               </span>
             </div>
           </div>

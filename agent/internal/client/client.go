@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -22,6 +24,10 @@ const defaultTimeout = 15 * time.Second
 type Client struct {
 	baseURL string
 	http    *http.Client
+	tlsCfg  *tls.Config
+	scheme  string
+	host    string
+	addr    string
 }
 
 func New(cfg *config.Config) (*Client, error) {
@@ -62,7 +68,36 @@ func New(cfg *config.Config) (*Client, error) {
 		Transport: transport,
 	}
 
-	return &Client{baseURL: baseURL, http: httpClient}, nil
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse server url: %w", err)
+	}
+	if parsed.Host == "" {
+		return nil, errors.New("server url missing host")
+	}
+	scheme := parsed.Scheme
+	if scheme == "" {
+		scheme = "https"
+	}
+	host := parsed.Hostname()
+	port := parsed.Port()
+	if port == "" {
+		if scheme == "http" {
+			port = "80"
+		} else {
+			port = "443"
+		}
+	}
+	addr := net.JoinHostPort(host, port)
+
+	return &Client{
+		baseURL: baseURL,
+		http:    httpClient,
+		tlsCfg:  tlsConfig,
+		scheme:  scheme,
+		host:    host,
+		addr:    addr,
+	}, nil
 }
 
 type EnrollRequest struct {
@@ -293,9 +328,10 @@ func (c *Client) SendLogBatch(ctx context.Context, serverID string, payload []by
 }
 
 type HeartbeatRequest struct {
-	Host string `json:"host,omitempty"`
-	IPv4 string `json:"ipv4,omitempty"`
-	IPv6 string `json:"ipv6,omitempty"`
+	Host   string `json:"host,omitempty"`
+	IPv4   string `json:"ipv4,omitempty"`
+	IPv6   string `json:"ipv6,omitempty"`
+	PingMs *int   `json:"ping_ms,omitempty"`
 }
 
 func (c *Client) UpdateHost(ctx context.Context, serverID string, reqBody HeartbeatRequest) error {
@@ -317,4 +353,30 @@ func (c *Client) UpdateHost(ctx context.Context, serverID string, reqBody Heartb
 		return &HTTPStatusError{StatusCode: resp.StatusCode, Status: resp.Status}
 	}
 	return nil
+}
+
+func (c *Client) Ping(ctx context.Context) (int, error) {
+	if c.addr == "" {
+		return 0, errors.New("server address not configured")
+	}
+	start := time.Now()
+	dialer := &net.Dialer{Timeout: defaultTimeout}
+	if c.scheme == "http" {
+		conn, err := dialer.DialContext(ctx, "tcp", c.addr)
+		if err != nil {
+			return 0, err
+		}
+		_ = conn.Close()
+		return int(time.Since(start).Milliseconds()), nil
+	}
+	cfg := c.tlsCfg.Clone()
+	if cfg.ServerName == "" && c.host != "" {
+		cfg.ServerName = c.host
+	}
+	conn, err := tls.DialWithDialer(dialer, "tcp", c.addr, cfg)
+	if err != nil {
+		return 0, err
+	}
+	_ = conn.Close()
+	return int(time.Since(start).Milliseconds()), nil
 }
