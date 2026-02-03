@@ -83,6 +83,7 @@ def _sign_public_key(
     serial: int,
     validity_days: int,
     comment: str,
+    validity_override: str | None = None,
 ) -> str:
     if not ca_private_key or not ca_public_key:
         raise RuntimeError("CA material missing")
@@ -102,7 +103,7 @@ def _sign_public_key(
             "-n",
             principal,
             "-V",
-            f"+{validity_days}d",
+            validity_override or f"+{validity_days}d",
             "-z",
             str(serial),
             pubkey_path,

@@ -8,6 +8,7 @@ import tempfile
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
+from django.conf import settings
 from django.utils import timezone
 
 from apps.audit.matching import find_matching_event_type
@@ -108,7 +109,8 @@ class ShellConsumer(AsyncWebsocketConsumer):
     async def _start_ssh(self, user):
         # Generate a short-lived keypair + SSH certificate and then
         # bridge the WebSocket to an SSH subprocess.
-        self.tempdir = tempfile.TemporaryDirectory(prefix="keywarden-shell-")
+        temp_base = "/dev/shm" if os.path.isdir("/dev/shm") and os.access("/dev/shm", os.W_OK) else None
+        self.tempdir = tempfile.TemporaryDirectory(prefix="keywarden-shell-", dir=temp_base)
         key_path, cert_path = await asyncio.to_thread(
             _generate_session_keypair,
             self.tempdir.name,
@@ -152,6 +154,13 @@ class ShellConsumer(AsyncWebsocketConsumer):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
+        for path in (key_path, cert_path, f"{key_path}.pub"):
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                continue
+            except Exception:
+                pass
         self.reader_task = asyncio.create_task(self._stream_output())
 
     async def _stream_output(self):
@@ -246,6 +255,7 @@ def _generate_session_keypair(tempdir: str, user, principal: str) -> tuple[str, 
         raise RuntimeError("ssh-keygen not available") from exc
     except subprocess.CalledProcessError as exc:
         raise RuntimeError(f"ssh-keygen failed: {exc.stderr.decode('utf-8', 'ignore')}") from exc
+    os.chmod(key_path, 0o600)
     pubkey_path = key_path + ".pub"
     with open(pubkey_path, "r", encoding="utf-8") as handle:
         public_key = handle.read().strip()
@@ -257,6 +267,7 @@ def _generate_session_keypair(tempdir: str, user, principal: str) -> tuple[str, 
         principal=principal,
         serial=serial,
         validity_days=1,
+        validity_override=f"+{settings.KEYWARDEN_SHELL_CERT_VALIDITY_MINUTES}m",
         comment=identity,
     )
     cert_path = key_path + "-cert.pub"
