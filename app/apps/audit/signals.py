@@ -11,17 +11,18 @@ from .utils import get_client_ip
 User = get_user_model()
 
 
-def _get_or_create_event(key: str, title: str, severity: str = AuditEventType.Severity.INFO) -> AuditEventType:
-    event, _ = AuditEventType.objects.get_or_create(
-        key=key,
-        defaults={"title": title, "default_severity": severity},
-    )
-    return event
+def _get_event(key: str) -> AuditEventType | None:
+    try:
+        return AuditEventType.objects.get(key=key)
+    except AuditEventType.DoesNotExist:
+        return None
 
 
 @receiver(user_logged_in)
 def on_user_logged_in(sender, request, user: User, **kwargs):
-    event = _get_or_create_event("user_login", "User logged in", AuditEventType.Severity.INFO)
+    event = _get_event("user_login")
+    if event is None:
+        return
     AuditLog.objects.create(
         created_at=timezone.now(),
         actor=user,
@@ -37,7 +38,9 @@ def on_user_logged_in(sender, request, user: User, **kwargs):
 
 @receiver(user_logged_out)
 def on_user_logged_out(sender, request, user: User, **kwargs):
-    event = _get_or_create_event("user_logout", "User logged out", AuditEventType.Severity.INFO)
+    event = _get_event("user_logout")
+    if event is None:
+        return
     AuditLog.objects.create(
         created_at=timezone.now(),
         actor=user,

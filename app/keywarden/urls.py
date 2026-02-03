@@ -16,3 +16,6 @@ urlpatterns = [
     path("api/auth/jwt/refresh/", TokenRefreshView.as_view(), name="jwt-refresh"),
     path("", RedirectView.as_view(pattern_name="servers:dashboard", permanent=False)),
 ]
+
+
+handler404 = "apps.core.views.disguised_not_found"

@@ -15,7 +15,13 @@ class AuditEventTypeSchema(Schema):
     key: str
     title: str
     description: str | None = None
+    kind: str
     default_severity: str
+    endpoints: list[str]
+    ip_whitelist_enabled: bool
+    ip_whitelist: list[str]
+    ip_blacklist_enabled: bool
+    ip_blacklist: list[str]
 
 
 class AuditLogSchema(Schema):
@@ -63,7 +69,13 @@ def build_router() -> Router:
                 "key": et.key,
                 "title": et.title,
                 "description": et.description or "",
+                "kind": et.kind,
                 "default_severity": et.default_severity,
+                "endpoints": list(et.endpoints or []),
+                "ip_whitelist_enabled": bool(et.ip_whitelist_enabled),
+                "ip_whitelist": list(et.ip_whitelist or []),
+                "ip_blacklist_enabled": bool(et.ip_blacklist_enabled),
+                "ip_blacklist": list(et.ip_blacklist or []),
             }
             for et in qs
         ]

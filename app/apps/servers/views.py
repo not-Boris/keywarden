@@ -62,6 +62,8 @@ def dashboard(request):
 @login_required(login_url="/accounts/login/")
 def detail(request, server_id: int):
     now = timezone.now()
+    # Authorization is enforced via object-level permissions before we do
+    # any other server-specific work.
     server = _get_server_or_404(request, server_id)
     can_shell = user_can_shell(request.user, server, now)
 
@@ -94,6 +96,8 @@ def detail(request, server_id: int):
 @login_required(login_url="/accounts/login/")
 def shell(request, server_id: int):
     server = _get_server_or_404(request, server_id)
+    # We intentionally return a 404 on denied shell access to avoid
+    # disclosing that the server exists but is restricted.
     if not user_can_shell(request.user, server):
         raise Http404("Shell access not available")
     _, system_username, certificate_key_id = _load_account_context(request, server)
@@ -145,6 +149,8 @@ def settings(request, server_id: int):
 
 
 def _get_server_or_404(request, server_id: int) -> Server:
+    # Centralized object lookup + permission gate. We raise 404 for both
+    # missing objects and permission denials to reduce enumeration signals.
     try:
         server = Server.objects.get(id=server_id)
     except Server.DoesNotExist:
@@ -155,6 +161,8 @@ def _get_server_or_404(request, server_id: int) -> Server:
 
 
 def _load_account_context(request, server: Server):
+    # Resolve the effective system username and the currently active SSH
+    # key/certificate context used by the shell UI.
     account = ServerAccount.objects.filter(server=server, user=request.user).first()
     system_username = account.system_username if account else render_system_username(
         request.user.username, request.user.id
@@ -162,4 +170,3 @@ def _load_account_context(request, server: Server):
     active_key = SSHKey.objects.filter(user=request.user, is_active=True).order_by("-created_at").first()
     certificate_key_id = active_key.id if active_key else None
     return account, system_username, certificate_key_id
-

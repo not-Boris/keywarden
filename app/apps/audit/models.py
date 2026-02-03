@@ -13,6 +13,10 @@ class AuditEventType(models.Model):
     Useful for consistent naming, severity, and descriptions.
     """
 
+    class Kind(models.TextChoices):
+        API = "api", "API"
+        WEBSOCKET = "websocket", "WebSocket"
+
     class Severity(models.TextChoices):
         INFO = "info", "Info"
         WARNING = "warning", "Warning"
@@ -22,8 +26,42 @@ class AuditEventType(models.Model):
     key = models.SlugField(max_length=64, unique=True, help_text="Stable machine key, e.g., user_login")
     title = models.CharField(max_length=128, help_text="Human-readable title")
     description = models.TextField(blank=True)
+    kind = models.CharField(
+        max_length=16,
+        choices=Kind.choices,
+        default=Kind.API,
+        db_index=True,
+        help_text="Whether this event type applies to API or WebSocket traffic.",
+    )
     default_severity = models.CharField(
         max_length=16, choices=Severity.choices, default=Severity.INFO, db_index=True
+    )
+    endpoints = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "List of endpoint patterns that should generate this event type. "
+            "Use one pattern per line in the admin form. Supports '*' wildcards "
+            "and optional METHOD prefixes like 'GET /api/v1/servers/*'."
+        ),
+    )
+    ip_whitelist_enabled = models.BooleanField(
+        default=False,
+        help_text="If enabled, only IPs in the whitelist will generate this event type.",
+    )
+    ip_whitelist = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of allowed IP addresses or CIDR ranges. One per line in the admin form.",
+    )
+    ip_blacklist_enabled = models.BooleanField(
+        default=False,
+        help_text="If enabled, IPs in the blacklist will be blocked for this event type.",
+    )
+    ip_blacklist = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of denied IP addresses or CIDR ranges. One per line in the admin form.",
     )
     created_at = models.DateTimeField(default=timezone.now, editable=False)
 
@@ -33,7 +71,7 @@ class AuditEventType(models.Model):
         ordering = ["key"]
 
     def __str__(self) -> str:
-        return f"{self.key} ({self.default_severity})"
+        return f"{self.key} [{self.kind}] ({self.default_severity})"
 
 
 class AuditLog(models.Model):
