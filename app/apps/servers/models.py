@@ -28,6 +28,8 @@ class Server(models.Model):
     agent_enrolled_at = models.DateTimeField(null=True, blank=True)
     agent_cert_fingerprint = models.CharField(max_length=128, null=True, blank=True)
     agent_cert_serial = models.CharField(max_length=64, null=True, blank=True)
+    last_heartbeat_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    last_ping_ms = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

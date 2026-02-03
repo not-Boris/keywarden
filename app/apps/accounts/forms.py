@@ -8,7 +8,7 @@ class ErasureRequestForm(forms.Form):
             attrs={
                 "rows": 4,
                 "placeholder": "Explain why you are requesting data erasure.",
-                "class": "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600",
+                "class": "block w-full resize-y rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500",
             }
         ),
         min_length=10,
@@ -18,22 +18,22 @@ class ErasureRequestForm(forms.Form):
 
 class SSHKeyForm(forms.Form):
     name = forms.CharField(
-        label="Key name",
+        label="Key Name",
         max_length=128,
         widget=forms.TextInput(
             attrs={
-                "placeholder": "MacBook Pro",
-                "class": "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600",
+                "placeholder": "Device Name",
+                "class": "block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500",
             }
         ),
     )
     public_key = forms.CharField(
-        label="SSH public key",
+        label="SSH Public Key",
         widget=forms.Textarea(
             attrs={
                 "rows": 4,
-                "placeholder": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB... you@host",
-                "class": "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600",
+                "placeholder": "ssh-ed25519 AAAaBBbBcCcc111122223333... user@host",
+                "class": "block w-full resize-y rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500",
             }
         ),
     )

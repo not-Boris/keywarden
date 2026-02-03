@@ -1,42 +1,113 @@
-<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-  <div class="flex items-center gap-4">
-    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-600 text-white text-xl font-semibold">
-      {{ server.initial }}
+<div class="space-y-4">
+  <nav class="flex" aria-label="Breadcrumb">
+    <ol class="inline-flex items-center space-x-1 text-sm text-gray-500">
+      <li class="inline-flex items-center">
+        <a href="{% url 'servers:dashboard' %}" class="inline-flex items-center gap-1 font-medium text-gray-600 hover:text-blue-700">
+          <svg class="h-4 w-4" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 3.172 2 10v7a1 1 0 0 0 1 1h5v-5h4v5h5a1 1 0 0 0 1-1v-7l-8-6.828Z"></path>
+          </svg>
+          Servers
+        </a>
+      </li>
+      <li class="inline-flex items-center">
+        <svg class="h-4 w-4 text-gray-400" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M7.05 4.55a1 1 0 0 1 1.4-1.42l6 5.9a1 1 0 0 1 0 1.42l-6 5.9a1 1 0 1 1-1.4-1.42L12.5 10 7.05 4.55Z"></path>
+        </svg>
+        <span class="ml-1 font-medium text-gray-700">{{ server.display_name }}</span>
+      </li>
+    </ol>
+  </nav>
+
+  <div class="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex items-center gap-4">
+      <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-700 text-lg font-semibold text-white shadow-sm">
+        {{ server.initial }}
+      </div>
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight text-gray-900">{{ server.display_name }}</h1>
+        <p class="text-sm text-gray-500">
+          {{ server.hostname|default:server.ipv4|default:server.ipv6|default:"Unassigned" }}
+        </p>
+      </div>
     </div>
-    <div>
-      <h1 class="text-2xl font-semibold tracking-tight text-gray-900">{{ server.display_name }}</h1>
-      <p class="text-sm text-gray-600">
-        {{ server.hostname|default:server.ipv4|default:server.ipv6|default:"Unassigned" }}
-      </p>
+    <div class="flex items-center gap-2">
+      <div class="relative">
+        <button
+          type="button"
+          data-tooltip-target="server-header-status-{{ server.id }}"
+          class="{% if server_status.is_active %}inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700{% else %}inline-flex items-center rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700{% endif %}"
+        >
+          {{ server_status.label }}: {{ server_status.detail }}
+        </button>
+        <div
+          id="server-header-status-{{ server.id }}"
+          role="tooltip"
+          class="invisible absolute z-10 inline-block w-64 rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700 shadow-sm opacity-0 transition-opacity"
+        >
+          <div class="space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-gray-500">Status</span>
+              <span class="font-medium text-gray-900">{{ server_status.label }}: {{ server_status.detail }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-gray-500">Ping</span>
+              <span class="font-medium text-gray-900">
+                {% if server_status.ping_ms is not None %}{{ server_status.ping_ms }}ms{% else %}—{% endif %}
+              </span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-gray-500">Hostname</span>
+              <span class="font-medium text-gray-900">{{ server.hostname|default:"—" }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-gray-500">IPv4</span>
+              <span class="font-medium text-gray-900">{{ server.ipv4|default:"—" }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-gray-500">IPv6</span>
+              <span class="font-medium text-gray-900">{{ server.ipv6|default:"—" }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-gray-500">Last heartbeat</span>
+              <span class="font-medium text-gray-900">
+                {% if server_status.heartbeat_at %}{{ server_status.heartbeat_at|date:"M j, Y H:i" }}{% else %}—{% endif %}
+              </span>
+            </div>
+          </div>
+          <div class="tooltip-arrow" data-popper-arrow></div>
+        </div>
+      </div>
+      <a href="{% url 'servers:dashboard' %}" class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+        Back to servers
+      </a>
     </div>
   </div>
-  <a href="{% url 'servers:dashboard' %}" class="text-sm font-semibold text-purple-700 hover:text-purple-800">Back to servers</a>
 </div>
 
-<nav class="flex flex-wrap gap-2 border-b border-gray-200 pb-2 text-sm font-semibold text-gray-500">
+<nav class="mt-4 flex flex-wrap gap-2 border-b border-gray-200 pb-3 text-sm font-medium text-gray-500">
   <a
     href="{% url 'servers:detail' server.id %}"
-    class="{% if active_tab == 'details' %}rounded-full bg-purple-50 px-3 py-1 text-purple-700{% else %}rounded-full bg-gray-100 px-3 py-1 text-gray-500 hover:text-gray-700{% endif %}"
+    class="{% if active_tab == 'details' %}rounded-full bg-blue-50 px-4 py-1.5 text-blue-700 ring-1 ring-blue-100{% else %}rounded-full bg-gray-100 px-4 py-1.5 text-gray-600 hover:bg-white hover:text-gray-900{% endif %}"
   >
     Details
   </a>
   <a
     href="{% url 'servers:audit' server.id %}"
-    class="{% if active_tab == 'audit' %}rounded-full bg-purple-50 px-3 py-1 text-purple-700{% else %}rounded-full bg-gray-100 px-3 py-1 text-gray-500 hover:text-gray-700{% endif %}"
+    class="{% if active_tab == 'audit' %}rounded-full bg-blue-50 px-4 py-1.5 text-blue-700 ring-1 ring-blue-100{% else %}rounded-full bg-gray-100 px-4 py-1.5 text-gray-600 hover:bg-white hover:text-gray-900{% endif %}"
   >
     Audit
   </a>
   {% if can_shell %}
     <a
       href="{% url 'servers:shell' server.id %}"
-      class="{% if active_tab == 'shell' %}rounded-full bg-purple-50 px-3 py-1 text-purple-700{% else %}rounded-full bg-gray-100 px-3 py-1 text-gray-500 hover:text-gray-700{% endif %}"
+      class="{% if active_tab == 'shell' %}rounded-full bg-blue-50 px-4 py-1.5 text-blue-700 ring-1 ring-blue-100{% else %}rounded-full bg-gray-100 px-4 py-1.5 text-gray-600 hover:bg-white hover:text-gray-900{% endif %}"
     >
       Shell
     </a>
   {% endif %}
   <a
     href="{% url 'servers:settings' server.id %}"
-    class="{% if active_tab == 'settings' %}rounded-full bg-purple-50 px-3 py-1 text-purple-700{% else %}rounded-full bg-gray-100 px-3 py-1 text-gray-500 hover:text-gray-700{% endif %}"
+    class="{% if active_tab == 'settings' %}rounded-full bg-blue-50 px-4 py-1.5 text-blue-700 ring-1 ring-blue-100{% else %}rounded-full bg-gray-100 px-4 py-1.5 text-gray-600 hover:bg-white hover:text-gray-900{% endif %}"
   >
     Settings
   </a>

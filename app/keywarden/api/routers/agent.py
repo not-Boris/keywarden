@@ -109,6 +109,7 @@ class AgentHeartbeatIn(Schema):
     host: Optional[str] = None
     ipv4: Optional[str] = None
     ipv6: Optional[str] = None
+    ping_ms: Optional[int] = None
 
 
 def build_router() -> Router:
@@ -304,7 +305,7 @@ def build_router() -> Router:
             server = Server.objects.get(id=server_id)
         except Server.DoesNotExist:
             raise HttpError(404, "Server not found")
-        updates: dict[str, str] = {}
+        updates: dict[str, str | int | datetime] = {}
         host = (payload.host or "").strip()[:253]
         if host:
             try:
@@ -319,6 +320,10 @@ def build_router() -> Router:
         ipv6 = _normalize_ip(payload.ipv6, 6)
         if ipv6 and server.ipv6 != ipv6:
             updates["ipv6"] = ipv6
+        now = timezone.now()
+        updates["last_heartbeat_at"] = now
+        if payload.ping_ms is not None:
+            updates["last_ping_ms"] = max(0, int(payload.ping_ms))
         if updates:
             for field, value in updates.items():
                 setattr(server, field, value)

@@ -8,47 +8,107 @@
     <title>{% block title %}Keywarden{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="{% static 'branding/keywarden-favicon.svg' %}">
     <link rel="icon" type="image/png" href="{% static 'ninja/favicon.png' %}">
-    <meta name="theme-color" content="#0b1f24">
+    <meta name="theme-color" content="#0f172a">
     <meta property="og:title" content="Keywarden">
     <meta name="twitter:card" content="summary">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     {% tailwind_css %}
     {% block extra_head %}{% endblock %}
   </head>
-  <body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
+  <body class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 text-slate-900 antialiased font-['Space_Grotesk']">
     <div class="min-h-screen flex flex-col">
     {% if not is_popout %}
-      <header class="border-b border-gray-200 bg-white">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div class="flex h-20 items-center justify-between">
-            <a href="/" class="inline-flex items-center gap-2">
-              <img src="{% static 'branding/keywarden-favicon.svg' %}" alt="Keywarden logo" class="h-10 w-10">
-              <span class="text-2xl font-semibold tracking-tight">Keywarden</span>
+      <header class="border-b border-gray-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/75">
+        <nav class="mx-auto max-w-screen-xl px-4 py-3 lg:px-6">
+          <div class="flex flex-wrap items-center justify-between">
+            <a href="/" class="flex items-center gap-3">
+              <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white p-1 shadow-sm ring-1 ring-blue-100">
+                <img src="{% static 'branding/keywarden-favicon.svg' %}" alt="Keywarden logo" class="h-8 w-8">
+              </span>
+              <span class="flex flex-col">
+                <span class="text-xl font-semibold leading-tight tracking-tight">Keywarden</span>
+                <span class="text-xs text-gray-500">Access control vault</span>
+              </span>
             </a>
-            <nav class="flex items-center gap-4">
+            <div class="flex items-center gap-3 md:order-2">
               {% if request.user.is_authenticated %}
-                <a href="{% url 'servers:dashboard' %}" class="text-sm font-medium text-gray-700 hover:text-purple-700">Servers</a>
-                <a href="{% url 'accounts:profile' %}" class="text-sm font-medium text-gray-700 hover:text-purple-700">Profile</a>
-                <a href="{% url 'accounts:logout' %}" class="inline-flex items-center rounded-md bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600">Logout</a>
+                <a
+                  href="{% url 'accounts:logout' %}"
+                  class="inline-flex items-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                >
+                  Logout
+                </a>
               {% else %}
-                <a href="{% url 'accounts:login' %}" class="inline-flex items-center rounded-md bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600">Login</a>
+                <a
+                  href="{% url 'accounts:login' %}"
+                  class="inline-flex items-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                >
+                  Login
+                </a>
               {% endif %}
-            </nav>
+              <button
+                data-collapse-toggle="navbar-default"
+                type="button"
+                class="inline-flex items-center rounded-lg p-2 text-sm text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 md:hidden"
+                aria-controls="navbar-default"
+                aria-expanded="false"
+              >
+                <span class="sr-only">Open main menu</span>
+                <svg class="h-6 w-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
+            <div class="hidden w-full md:order-1 md:block md:w-auto" id="navbar-default">
+              <ul class="mt-4 flex flex-col rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm font-medium text-gray-700 md:mt-0 md:flex-row md:space-x-6 md:border-0 md:bg-transparent md:p-0">
+                {% if request.user.is_authenticated %}
+                  <li>
+                    <a
+                      href="{% url 'servers:dashboard' %}"
+                      class="block rounded px-3 py-2 hover:bg-gray-100 md:px-0 md:py-0 md:hover:bg-transparent md:hover:text-blue-700"
+                    >
+                      Servers
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="{% url 'accounts:profile' %}"
+                      class="block rounded px-3 py-2 hover:bg-gray-100 md:px-0 md:py-0 md:hover:bg-transparent md:hover:text-blue-700"
+                    >
+                      Profile
+                    </a>
+                  </li>
+                {% endif %}
+              </ul>
+            </div>
           </div>
-        </div>
+        </nav>
       </header>
     {% endif %}
 
-    <main class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 flex-1 w-full">
+    <main class="mx-auto w-full max-w-screen-xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
       {% block content %}{% endblock %}
     </main>
 
     {% if not is_popout %}
       <footer class="border-t border-gray-200 bg-white">
-        <div class="mx-auto max-w-7xl px-4 py-6 text-sm text-gray-500 sm:px-6 lg:px-8">
-          <a class="underline text-blue-600 hover:text-blue-800 visited:text-purple-600" href="https://git.ntbx.io/boris/keywarden">Keywarden</a> | <a class="underline text-blue-600 hover:text-blue-800 visited:text-purple-600" href="https://ntbx.io">George Wilkinson</a> (2025)
+        <div class="mx-auto flex w-full max-w-screen-xl flex-col gap-2 px-4 py-6 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <div class="flex items-center gap-2">
+            <span class="font-medium text-gray-700">Keywarden</span>
+            <span class="text-gray-300">•</span>
+            <span>Secure access manager</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <a class="font-medium text-blue-700 hover:underline" href="https://git.ntbx.io/boris/keywarden">Repository</a>
+            <span class="text-gray-300">•</span>
+            <a class="font-medium text-blue-700 hover:underline" href="https://ntbx.io">George Wilkinson</a>
+          </div>
         </div>
       </footer>
     {% endif %}
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@4.0.1/dist/flowbite.min.js"></script>
   </body>
-  </html>
+</html>

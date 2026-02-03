@@ -3,136 +3,225 @@
 {% block title %}Profile • Keywarden{% endblock %}
 
 {% block content %}
-  <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-    <div>
-      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-        <h1 class="mb-6 text-xl font-semibold tracking-tight text-gray-900">Your Profile</h1>
-        <dl class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-          <div>
-            <dt class="text-sm font-medium text-gray-500">Username</dt>
-            <dd class="mt-1 text-sm text-gray-900">{{ user.username }}</dd>
+  <div class="space-y-6">
+    <div class="grid gap-6 lg:grid-cols-3">
+      <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
+        <div class="space-y-2">
+          <h1 class="text-xl font-semibold tracking-tight text-gray-900">Your Profile</h1>
+          <p class="text-sm text-gray-500">Account details and contact information.</p>
+        </div>
+        <dl class="mt-6 grid grid-cols-1 gap-4 text-sm text-gray-600 sm:grid-cols-2">
+          <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Username</dt>
+            <dd class="mt-2 text-sm font-medium text-gray-900">{{ user.username }}</dd>
           </div>
-          <div>
-            <dt class="text-sm font-medium text-gray-500">Email</dt>
-            <dd class="mt-1 text-sm text-gray-900">{{ user.email }}</dd>
+          <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Email</dt>
+            <dd class="mt-2 text-sm font-medium text-gray-900">{{ user.email }}</dd>
           </div>
-          <div>
-            <dt class="text-sm font-medium text-gray-500">First name</dt>
-            <dd class="mt-1 text-sm text-gray-900">{{ user.first_name|default:"—" }}</dd>
+          <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">First name</dt>
+            <dd class="mt-2 text-sm font-medium text-gray-900">{{ user.first_name|default:"—" }}</dd>
           </div>
-          <div>
-            <dt class="text-sm font-medium text-gray-500">Last name</dt>
-            <dd class="mt-1 text-sm text-gray-900">{{ user.last_name|default:"—" }}</dd>
+          <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Last name</dt>
+            <dd class="mt-2 text-sm font-medium text-gray-900">{{ user.last_name|default:"—" }}</dd>
           </div>
         </dl>
-      </div>
-    </div>
-    <div>
-      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-        <h2 class="mb-4 text-base font-semibold tracking-tight text-gray-900">Single Sign-On</h2>
-        {% if auth_mode == "hybrid" %}
-          <div class="mt-6 border-t border-gray-200 pt-6">
-            <p class="text-sm text-gray-600">
-              Optional: Link your account with your identity provider for single sign-on.
-              <a href="/oidc/authenticate/" class="font-medium text-purple-700 hover:text-purple-800">Link with SSO</a>
-            </p>
-          </div>
-        {% elif auth_mode == "oidc" %}
-          <p class="text-sm text-gray-600">OIDC is required. Sign-in is managed by your identity provider.</p>
-        {% else %}
-          <p class="text-sm text-gray-600">OIDC is disabled. You are using native authentication.</p>
-        {% endif %}
-      </div>
-    </div>
-  </div>
+      </section>
 
-  <div class="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-    <h2 class="text-base font-semibold tracking-tight text-gray-900">SSH certificates</h2>
-    <p class="mt-2 text-sm text-gray-600">
-      Upload your SSH public key to receive a signed certificate for server access.
-    </p>
+      <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div class="space-y-2">
+          <h2 class="text-base font-semibold text-gray-900">Single Sign-On</h2>
+          <p class="text-sm text-gray-500">Manage how you authenticate with external providers.</p>
+        </div>
+        <div class="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+          {% if auth_mode == "hybrid" %}
+            Optional: Link your account with your identity provider for single sign-on.
+            <a href="/oidc/authenticate/" class="font-semibold text-blue-700 hover:underline">Link with SSO</a>
+          {% elif auth_mode == "oidc" %}
+            OIDC is required. Sign-in is managed by your identity provider.
+          {% else %}
+            OIDC is disabled. You are using native authentication.
+          {% endif %}
+        </div>
+      </section>
+    </div>
 
-    {% if can_add_key %}
-      <form method="post" class="mt-4 space-y-3">
-        {% csrf_token %}
-        <input type="hidden" name="form_type" value="ssh_key">
+    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <label for="{{ key_form.name.id_for_label }}" class="block text-sm font-medium text-gray-700">
-            Key name
-          </label>
-          <div class="mt-1">
+          <h2 class="text-base font-semibold text-gray-900">SSH certificates</h2>
+          <p class="mt-1 text-sm text-gray-500">
+            Upload your SSH public key to receive a signed certificate for server access.
+          </p>
+        </div>
+        <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">Certificates</span>
+      </div>
+
+      {% if can_add_key %}
+        <form method="post" class="mt-6 grid gap-4 lg:grid-cols-2">
+          {% csrf_token %}
+          <input type="hidden" name="form_type" value="ssh_key">
+          <div>
+            <label for="{{ key_form.name.id_for_label }}" class="mb-2 block text-sm font-medium text-gray-900">
+              Key name
+            </label>
             {{ key_form.name }}
+            {% if key_form.name.errors %}
+              <p class="mt-1 text-sm text-red-600">{{ key_form.name.errors|striptags }}</p>
+            {% endif %}
           </div>
-          {% if key_form.name.errors %}
-            <p class="mt-1 text-sm text-red-600">{{ key_form.name.errors|striptags }}</p>
-          {% endif %}
-        </div>
-        <div>
-          <label for="{{ key_form.public_key.id_for_label }}" class="block text-sm font-medium text-gray-700">
-            SSH public key
-          </label>
-          <div class="mt-1">
+          <div class="lg:col-span-2">
+            <label for="{{ key_form.public_key.id_for_label }}" class="mb-2 block text-sm font-medium text-gray-900">
+              SSH public key
+            </label>
             {{ key_form.public_key }}
+            {% if key_form.public_key.errors %}
+              <p class="mt-1 text-sm text-red-600">{{ key_form.public_key.errors|striptags }}</p>
+            {% endif %}
           </div>
-          {% if key_form.public_key.errors %}
-            <p class="mt-1 text-sm text-red-600">{{ key_form.public_key.errors|striptags }}</p>
+          {% if key_form.non_field_errors %}
+            <p class="text-sm text-red-600">{{ key_form.non_field_errors|striptags }}</p>
+          {% endif %}
+          <div>
+            <button
+              type="submit"
+              class="inline-flex items-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300"
+            >
+              Upload key
+            </button>
+          </div>
+        </form>
+      {% else %}
+        <p class="mt-4 text-sm text-gray-600">You do not have permission to add SSH keys.</p>
+      {% endif %}
+
+      {% if ssh_keys %}
+        <div class="mt-6 overflow-hidden rounded-xl border border-gray-200">
+          <table class="w-full text-left text-sm text-gray-500">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+              <tr>
+                <th scope="col" class="px-6 py-3">Key</th>
+                <th scope="col" class="px-6 py-3">Fingerprint</th>
+                <th scope="col" class="px-6 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for key in ssh_keys %}
+                <tr class="border-t bg-white">
+                  <th scope="row" class="px-6 py-4 font-medium text-gray-900">
+                    {{ key.name }}
+                  </th>
+                  <td class="px-6 py-4 text-xs text-gray-500">{{ key.fingerprint }}</td>
+                  <td class="px-6 py-4">
+                    <div class="flex flex-wrap items-center justify-end gap-2">
+                      {% if key.is_active %}
+                        <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">Active</span>
+                        <div class="inline-flex rounded-lg shadow-sm" role="group">
+                          <button
+                            type="button"
+                            class="inline-flex items-center rounded-l-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            data-download-url="/api/v1/keys/{{ key.id }}/certificate"
+                          >
+                            Download
+                          </button>
+                          <button
+                            type="button"
+                            class="inline-flex items-center rounded-r-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            data-download-url="/api/v1/keys/{{ key.id }}/certificate.sha256"
+                          >
+                            Hash
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          class="inline-flex items-center rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-300 js-regenerate-cert"
+                          data-key-id="{{ key.id }}"
+                        >
+                          Regenerate
+                        </button>
+                      {% else %}
+                        <span class="inline-flex items-center rounded-full bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700">Revoked</span>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="mt-4 text-sm text-gray-600">No SSH keys uploaded yet.</p>
+      {% endif %}
+    </section>
+
+    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 class="text-base font-semibold text-gray-900">Data erasure request</h2>
+          <p class="mt-1 text-sm text-gray-500">
+            Submit a GDPR erasure request to anonymize your account data. An administrator
+            must review and approve the request before processing.
+          </p>
+        </div>
+        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">GDPR</span>
+      </div>
+
+      {% if erasure_request %}
+        <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</span>
+            <span class="inline-flex items-center rounded-full bg-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-700">
+              {{ erasure_request.status|capfirst }}
+            </span>
+            <span class="text-gray-500">Requested {{ erasure_request.requested_at|date:"M j, Y H:i" }}</span>
+          </div>
+          {% if erasure_request.decided_at %}
+            <p class="mt-2 text-gray-600">
+              Decision {{ erasure_request.decided_at|date:"M j, Y H:i" }}.
+              {% if erasure_request.decision_reason %}
+                Reason: {{ erasure_request.decision_reason }}
+              {% endif %}
+            </p>
+          {% endif %}
+          {% if erasure_request.status == "processed" %}
+            <p class="mt-2 text-gray-600">
+              Your account has been anonymized. Access has been revoked and SSH keys disabled.
+            </p>
           {% endif %}
         </div>
-        {% if key_form.non_field_errors %}
-          <p class="text-sm text-red-600">{{ key_form.non_field_errors|striptags }}</p>
-        {% endif %}
-        <button type="submit" class="inline-flex items-center rounded-md bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600">
-          Upload key
-        </button>
-      </form>
-    {% else %}
-      <p class="mt-4 text-sm text-gray-600">You do not have permission to add SSH keys.</p>
-    {% endif %}
+      {% endif %}
 
-    {% if ssh_keys %}
-      <div class="mt-6 divide-y divide-gray-200">
-        {% for key in ssh_keys %}
-          <div class="flex items-center justify-between py-4">
-            <div>
-              <p class="text-sm font-semibold text-gray-900">{{ key.name }}</p>
-              <p class="text-xs text-gray-500">{{ key.fingerprint }}</p>
-            </div>
-            <div class="flex items-center gap-3">
-              {% if key.is_active %}
-                <div class="inline-flex overflow-hidden rounded-md shadow-sm">
-                  <button
-                    type="button"
-                    class="inline-flex items-center rounded-l-md bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700"
-                    data-download-url="/api/v1/keys/{{ key.id }}/certificate"
-                  >
-                    Download
-                  </button>
-                  <button
-                    type="button"
-                    class="inline-flex items-center rounded-r-md border border-l-0 border-gray-200 bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200"
-                    data-download-url="/api/v1/keys/{{ key.id }}/certificate.sha256"
-                  >
-                    Hash
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  class="inline-flex items-center rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 js-regenerate-cert"
-                  data-key-id="{{ key.id }}"
-                >
-                  Regenerate
-                </button>
-              {% else %}
-                <span class="text-xs font-semibold text-gray-500">Revoked</span>
-              {% endif %}
-            </div>
+      {% if not erasure_request or erasure_request.status != "pending" %}
+        <form method="post" class="mt-6 grid gap-4">
+          {% csrf_token %}
+          <input type="hidden" name="form_type" value="erasure">
+          <div>
+            <label for="{{ erasure_form.reason.id_for_label }}" class="mb-2 block text-sm font-medium text-gray-900">
+              Reason for request
+            </label>
+            {{ erasure_form.reason }}
+            {% if erasure_form.reason.errors %}
+              <p class="mt-1 text-sm text-red-600">{{ erasure_form.reason.errors|striptags }}</p>
+            {% endif %}
           </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="mt-4 text-sm text-gray-600">No SSH keys uploaded yet.</p>
-    {% endif %}
+          {% if erasure_form.non_field_errors %}
+            <p class="text-sm text-red-600">{{ erasure_form.non_field_errors|striptags }}</p>
+          {% endif %}
+          <div>
+            <button
+              type="submit"
+              class="inline-flex items-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300"
+            >
+              Submit erasure request
+            </button>
+          </div>
+        </form>
+      {% endif %}
+    </section>
   </div>
+
   <script>
     (function () {
       function getCookie(name) {
@@ -191,61 +280,4 @@
       }
     })();
   </script>
-
-  <div class="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-    <h2 class="text-base font-semibold tracking-tight text-gray-900">Data erasure request</h2>
-    <p class="mt-2 text-sm text-gray-600">
-      Submit a GDPR erasure request to anonymize your account data. An administrator
-      must review and approve the request before processing.
-    </p>
-
-    {% if erasure_request %}
-      <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="font-semibold">Status:</span>
-          <span class="inline-flex items-center rounded-full bg-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-700">
-            {{ erasure_request.status|capfirst }}
-          </span>
-          <span class="text-gray-500">Requested {{ erasure_request.requested_at|date:"M j, Y H:i" }}</span>
-        </div>
-        {% if erasure_request.decided_at %}
-          <p class="mt-2 text-gray-600">
-            Decision {{ erasure_request.decided_at|date:"M j, Y H:i" }}.
-            {% if erasure_request.decision_reason %}
-              Reason: {{ erasure_request.decision_reason }}
-            {% endif %}
-          </p>
-        {% endif %}
-        {% if erasure_request.status == "processed" %}
-          <p class="mt-2 text-gray-600">
-            Your account has been anonymized. Access has been revoked and SSH keys disabled.
-          </p>
-        {% endif %}
-      </div>
-    {% endif %}
-
-    {% if not erasure_request or erasure_request.status != "pending" %}
-      <form method="post" class="mt-4 space-y-3">
-        {% csrf_token %}
-        <input type="hidden" name="form_type" value="erasure">
-        <div>
-          <label for="{{ erasure_form.reason.id_for_label }}" class="block text-sm font-medium text-gray-700">
-            Reason for request
-          </label>
-          <div class="mt-1">
-            {{ erasure_form.reason }}
-          </div>
-          {% if erasure_form.reason.errors %}
-            <p class="mt-1 text-sm text-red-600">{{ erasure_form.reason.errors|striptags }}</p>
-          {% endif %}
-        </div>
-        {% if erasure_form.non_field_errors %}
-          <p class="text-sm text-red-600">{{ erasure_form.non_field_errors|striptags }}</p>
-        {% endif %}
-        <button type="submit" class="inline-flex items-center rounded-md bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600">
-          Submit erasure request
-        </button>
-      </form>
-    {% endif %}
-  </div>
 {% endblock %}

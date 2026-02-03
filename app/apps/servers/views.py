@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.http import Http404
@@ -44,14 +47,16 @@ def dashboard(request):
         if expires_at is None or expires_at > current:
             expires_map[access.server_id] = expires_at
 
-    servers = [
-        {
-            "server": server,
-            "expires_at": expires_map.get(server.id),
-            "last_accessed": None,
-        }
-        for server in server_qs
-    ]
+    servers = []
+    for server in server_qs:
+        servers.append(
+            {
+                "server": server,
+                "expires_at": expires_map.get(server.id),
+                "last_accessed": None,
+                "status": _build_server_status(server, now),
+            }
+        )
 
     context = {
         "servers": servers,
@@ -89,12 +94,14 @@ def detail(request, server_id: int):
         "certificate_key_id": certificate_key_id,
         "active_tab": "details",
         "can_shell": can_shell,
+        "server_status": _build_server_status(server, now),
     }
     return render(request, "servers/detail.html", context)
 
 
 @login_required(login_url="/accounts/login/")
 def shell(request, server_id: int):
+    now = timezone.now()
     server = _get_server_or_404(request, server_id)
     # We intentionally return a 404 on denied shell access to avoid
     # disclosing that the server exists but is restricted.
@@ -122,28 +129,33 @@ def shell(request, server_id: int):
         "active_tab": "shell",
         "is_popout": request.GET.get("popout") == "1",
         "can_shell": True,
+        "server_status": _build_server_status(server, now),
     }
     return render(request, "servers/shell.html", context)
 
 
 @login_required(login_url="/accounts/login/")
 def audit(request, server_id: int):
+    now = timezone.now()
     server = _get_server_or_404(request, server_id)
     context = {
         "server": server,
         "active_tab": "audit",
         "can_shell": user_can_shell(request.user, server),
+        "server_status": _build_server_status(server, now),
     }
     return render(request, "servers/audit.html", context)
 
 
 @login_required(login_url="/accounts/login/")
 def settings(request, server_id: int):
+    now = timezone.now()
     server = _get_server_or_404(request, server_id)
     context = {
         "server": server,
         "active_tab": "settings",
         "can_shell": user_can_shell(request.user, server),
+        "server_status": _build_server_status(server, now),
     }
     return render(request, "servers/settings.html", context)
 
@@ -170,3 +182,47 @@ def _load_account_context(request, server: Server):
     active_key = SSHKey.objects.filter(user=request.user, is_active=True).order_by("-created_at").first()
     certificate_key_id = active_key.id if active_key else None
     return account, system_username, certificate_key_id
+
+
+def _format_age_short(delta: timedelta) -> str:
+    seconds = max(0, int(delta.total_seconds()))
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m"
+    hours = minutes // 60
+    if hours < 48:
+        return f"{hours}h"
+    days = hours // 24
+    if days < 14:
+        return f"{days}d"
+    weeks = days // 7
+    return f"{weeks}w"
+
+
+def _build_server_status(server: Server, now):
+    stale_seconds = int(getattr(settings, "KEYWARDEN_HEARTBEAT_STALE_SECONDS", 120))
+    heartbeat_at = getattr(server, "last_heartbeat_at", None)
+    ping_ms = getattr(server, "last_ping_ms", None)
+    if heartbeat_at:
+        age = now - heartbeat_at
+        age_seconds = max(0, int(age.total_seconds()))
+        is_active = age_seconds <= stale_seconds
+        age_short = _format_age_short(age)
+    else:
+        is_active = False
+        age_short = "never"
+    label = "Active" if is_active else "Inactive"
+    if is_active:
+        detail = f"{ping_ms}ms" if ping_ms is not None else "—"
+    else:
+        detail = age_short
+    return {
+        "is_active": is_active,
+        "label": label,
+        "detail": detail,
+        "ping_ms": ping_ms,
+        "age_short": age_short,
+        "heartbeat_at": heartbeat_at,
+    }
