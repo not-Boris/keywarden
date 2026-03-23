@@ -221,4 +221,6 @@ __marimo__/
 nginx/logs/*
 nginx/certs/*.pem
 
+*.pdf
+
 theme/__pycache__/*

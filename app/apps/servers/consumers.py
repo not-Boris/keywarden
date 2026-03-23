@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import secrets
+import shutil
 import subprocess
 import tempfile
 
@@ -31,6 +32,10 @@ class ShellConsumer(AsyncWebsocketConsumer):
         self.proc = None
         self.reader_task = None
         self.tempdir = None
+        self.tempdir_path = ""
+        self.ssh_started = False
+        self.key_cleanup_task = None
+        self.key_paths = []
         self.system_username = ""
         self.shell_target = ""
         self.server_id: int | None = None
@@ -86,15 +91,19 @@ class ShellConsumer(AsyncWebsocketConsumer):
         if self.reader_task:
             self.reader_task.cancel()
             self.reader_task = None
+        if self.key_cleanup_task:
+            self.key_cleanup_task.cancel()
+            self.key_cleanup_task = None
         if self.proc and self.proc.returncode is None:
             self.proc.terminate()
             try:
                 await asyncio.wait_for(self.proc.wait(), timeout=2.0)
             except asyncio.TimeoutError:
                 self.proc.kill()
-        if self.tempdir:
-            self.tempdir.cleanup()
-            self.tempdir = None
+        if self.tempdir_path and self.ssh_started:
+            shutil.rmtree(self.tempdir_path, ignore_errors=True)
+            self.tempdir_path = ""
+        self.tempdir = None
 
     async def receive(self, text_data=None, bytes_data=None):
         if not self.proc or not self.proc.stdin:
@@ -115,10 +124,10 @@ class ShellConsumer(AsyncWebsocketConsumer):
         # bridge the WebSocket to an SSH subprocess.
         # Prefer tmpfs when available so the private key never hits disk.
         temp_base = "/dev/shm" if os.path.isdir("/dev/shm") and os.access("/dev/shm", os.W_OK) else None
-        self.tempdir = tempfile.TemporaryDirectory(prefix="keywarden-shell-", dir=temp_base)
+        self.tempdir_path = tempfile.mkdtemp(prefix="keywarden-shell-", dir=temp_base)
         key_path, cert_path = await asyncio.to_thread(
             _generate_session_keypair,
-            self.tempdir.name,
+            self.tempdir_path,
             user,
             self.system_username,
         )
@@ -160,14 +169,9 @@ class ShellConsumer(AsyncWebsocketConsumer):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
-        # Delete key material immediately after the SSH process has it open.
-        for path in (key_path, cert_path, f"{key_path}.pub"):
-            try:
-                os.remove(path)
-            except FileNotFoundError:
-                continue
-            except Exception:
-                pass
+        self.ssh_started = True
+        self.key_paths = [key_path, cert_path, f"{key_path}.pub"]
+        self.key_cleanup_task = asyncio.create_task(self._cleanup_keys_after_delay(5))
         self.reader_task = asyncio.create_task(self._stream_output())
 
     async def _stream_output(self):
@@ -180,6 +184,19 @@ class ShellConsumer(AsyncWebsocketConsumer):
                 break
             await self.send(bytes_data=chunk)
         await self.close()
+
+    async def _cleanup_keys_after_delay(self, delay_seconds: int):
+        try:
+            await asyncio.sleep(delay_seconds)
+            for path in self.key_paths:
+                try:
+                    os.remove(path)
+                except FileNotFoundError:
+                    continue
+                except Exception:
+                    pass
+        finally:
+            self.key_paths = []
 
     @database_sync_to_async
     def _get_server(self, user, server_id: int):
