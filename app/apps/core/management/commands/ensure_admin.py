@@ -51,8 +51,12 @@ class Command(BaseCommand):
         changed = False
 
         if user.email != email:
-            user.email = email
-            changed = True
+            self.stdout.write(
+                self.style.WARNING(
+                    "Superuser email differs from environment value; keeping existing "
+                    "email because account emails are immutable."
+                )
+            )
 
         # Ensure flags are correct
         if not user.is_staff:
@@ -69,4 +73,3 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f"Superuser '{username}' updated."))
         else:
             self.stdout.write(self.style.SUCCESS(f"Superuser '{username}' already present."))
-

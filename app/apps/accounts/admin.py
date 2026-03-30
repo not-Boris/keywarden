@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.utils import timezone
 from unfold.admin import ModelAdmin
 
-from .models import ErasureRequest
+from .models import ErasureRequest, ExternalIdentity
 
 
 class ErasureRequestAdminForm(forms.ModelForm):
@@ -56,3 +56,36 @@ class ErasureRequestAdmin(ModelAdmin):
             obj.decided_at = timezone.now()
             obj.decided_by = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(ExternalIdentity)
+class ExternalIdentityAdmin(ModelAdmin):
+    list_display = (
+        "id",
+        "user",
+        "provider_type",
+        "provider_id",
+        "subject",
+        "email_at_link",
+        "last_login_at",
+    )
+    list_filter = ("provider_type", "provider_id")
+    search_fields = ("user__username", "user__email", "subject", "provider_id", "issuer")
+    readonly_fields = (
+        "user",
+        "provider_type",
+        "provider_id",
+        "issuer",
+        "subject",
+        "email_at_link",
+        "details",
+        "created_at",
+        "updated_at",
+        "last_login_at",
+    )
+
+    def has_add_permission(self, request) -> bool:
+        return False
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        return False

@@ -25,6 +25,14 @@
           {% endif %}
         </div>
         <div>
+          <h3 class="kw-title">{% trans "Social Login Status" %}</h3>
+          {% if dashboard_status.social_configured %}
+            <p class="kw-subtitle kw-good">{% trans "Configured" %}</p>
+          {% else %}
+            <p class="kw-subtitle kw-warn">{% trans "Unconfigured" %}</p>
+          {% endif %}
+        </div>
+        <div>
           <h3 class="kw-title">{% trans "Users" %}</h3>
           <p class="kw-count">{{ dashboard_status.user_count }}</p>
           <p class="kw-subtitle {% if dashboard_status.has_superuser %}kw-good{% else %}kw-bad{% endif %}">

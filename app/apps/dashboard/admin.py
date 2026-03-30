@@ -24,6 +24,12 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     compressed_fields = True
     warn_unsaved_form = True
 
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj:
+            readonly.extend(["email"])
+        return tuple(dict.fromkeys(readonly))
+
 
 @admin.register(Group)
 class GroupAdmin(BaseGroupAdmin, ModelAdmin):

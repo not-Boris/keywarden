@@ -10,10 +10,15 @@ def dashboard_status(request):
     oidc_configured = bool(
         getattr(settings, "OIDC_RP_CLIENT_ID", None)
         and getattr(settings, "OIDC_RP_CLIENT_SECRET", None)
-        and getattr(settings, "OIDC_OP_AUTHORIZATION_ENDPOINT", None)
-        and getattr(settings, "OIDC_OP_TOKEN_ENDPOINT", None)
-        and getattr(settings, "OIDC_OP_USER_ENDPOINT", None)
-        and getattr(settings, "OIDC_OP_JWKS_ENDPOINT", None)
+        and (
+            getattr(settings, "OIDC_OP_DISCOVERY_ENDPOINT", None)
+            or (
+                getattr(settings, "OIDC_OP_AUTHORIZATION_ENDPOINT", None)
+                and getattr(settings, "OIDC_OP_TOKEN_ENDPOINT", None)
+                and getattr(settings, "OIDC_OP_USER_ENDPOINT", None)
+                and getattr(settings, "OIDC_OP_JWKS_ENDPOINT", None)
+            )
+        )
     )
 
     return {
@@ -23,7 +28,7 @@ def dashboard_status(request):
             "group_count": group_count,
             "has_superuser": has_superuser,
             "oidc_configured": oidc_configured,
+            "social_configured": bool(getattr(settings, "KEYWARDEN_SOCIAL_AUTH_ENABLED", False)),
         }
     }
-
 

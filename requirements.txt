@@ -5,6 +5,7 @@ djangorestframework==3.15.2
 djangorestframework-simplejwt==5.3.1
 Pillow>=10.0.0
 mozilla-django-oidc>=5.0.2
+django-allauth>=65.0.0
 django-unfold>=0.76.0
 django-tailwind==4.4.0
 django-guardian>=3.2.0

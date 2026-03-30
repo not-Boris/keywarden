@@ -9,6 +9,19 @@ from django.utils.translation import gettext_lazy as _
 # Load environment overrides early so settings can reference them.
 load_dotenv()
 
+
+def env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_csv(name: str, default: str = "") -> list[str]:
+    raw = os.getenv(name, default)
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = os.getenv("KEYWARDEN_SECRET_KEY")
@@ -20,6 +33,50 @@ CSRF_TRUSTED_ORIGINS = [
     for origin in os.getenv("KEYWARDEN_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+
+KEYWARDEN_SOCIAL_GOOGLE_CLIENT_ID = os.getenv("KEYWARDEN_SOCIAL_GOOGLE_CLIENT_ID", "").strip()
+KEYWARDEN_SOCIAL_GOOGLE_CLIENT_SECRET = os.getenv("KEYWARDEN_SOCIAL_GOOGLE_CLIENT_SECRET", "").strip()
+KEYWARDEN_SOCIAL_GITHUB_CLIENT_ID = os.getenv("KEYWARDEN_SOCIAL_GITHUB_CLIENT_ID", "").strip()
+KEYWARDEN_SOCIAL_GITHUB_CLIENT_SECRET = os.getenv("KEYWARDEN_SOCIAL_GITHUB_CLIENT_SECRET", "").strip()
+KEYWARDEN_SOCIAL_APPLE_CLIENT_ID = os.getenv("KEYWARDEN_SOCIAL_APPLE_CLIENT_ID", "").strip()
+KEYWARDEN_SOCIAL_APPLE_CLIENT_SECRET = os.getenv("KEYWARDEN_SOCIAL_APPLE_CLIENT_SECRET", "").strip()
+
+KEYWARDEN_SOCIAL_GOOGLE_ENABLED = env_bool(
+    "KEYWARDEN_SOCIAL_GOOGLE_ENABLED",
+    default=bool(KEYWARDEN_SOCIAL_GOOGLE_CLIENT_ID and KEYWARDEN_SOCIAL_GOOGLE_CLIENT_SECRET),
+)
+KEYWARDEN_SOCIAL_GITHUB_ENABLED = env_bool(
+    "KEYWARDEN_SOCIAL_GITHUB_ENABLED",
+    default=bool(KEYWARDEN_SOCIAL_GITHUB_CLIENT_ID and KEYWARDEN_SOCIAL_GITHUB_CLIENT_SECRET),
+)
+KEYWARDEN_SOCIAL_APPLE_ENABLED = env_bool(
+    "KEYWARDEN_SOCIAL_APPLE_ENABLED",
+    default=bool(KEYWARDEN_SOCIAL_APPLE_CLIENT_ID and KEYWARDEN_SOCIAL_APPLE_CLIENT_SECRET),
+)
+
+KEYWARDEN_SOCIAL_GOOGLE_CONFIGURED = bool(
+    KEYWARDEN_SOCIAL_GOOGLE_ENABLED
+    and KEYWARDEN_SOCIAL_GOOGLE_CLIENT_ID
+    and KEYWARDEN_SOCIAL_GOOGLE_CLIENT_SECRET
+)
+KEYWARDEN_SOCIAL_GITHUB_CONFIGURED = bool(
+    KEYWARDEN_SOCIAL_GITHUB_ENABLED
+    and KEYWARDEN_SOCIAL_GITHUB_CLIENT_ID
+    and KEYWARDEN_SOCIAL_GITHUB_CLIENT_SECRET
+)
+KEYWARDEN_SOCIAL_APPLE_CONFIGURED = bool(
+    KEYWARDEN_SOCIAL_APPLE_ENABLED
+    and KEYWARDEN_SOCIAL_APPLE_CLIENT_ID
+    and KEYWARDEN_SOCIAL_APPLE_CLIENT_SECRET
+)
+
+KEYWARDEN_SOCIAL_AUTH_ENABLED = any(
+    (
+        KEYWARDEN_SOCIAL_GOOGLE_CONFIGURED,
+        KEYWARDEN_SOCIAL_GITHUB_CONFIGURED,
+        KEYWARDEN_SOCIAL_APPLE_CONFIGURED,
+    )
+)
 
 # Default to secure cookies and respect TLS termination headers.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -54,6 +111,22 @@ INSTALLED_APPS = [
     "keywarden"
 ]
 
+if KEYWARDEN_SOCIAL_AUTH_ENABLED:
+    INSTALLED_APPS.extend(
+        [
+            "django.contrib.sites",
+            "allauth",
+            "allauth.account",
+            "allauth.socialaccount",
+        ]
+    )
+    if KEYWARDEN_SOCIAL_GOOGLE_CONFIGURED:
+        INSTALLED_APPS.append("allauth.socialaccount.providers.google")
+    if KEYWARDEN_SOCIAL_GITHUB_CONFIGURED:
+        INSTALLED_APPS.append("allauth.socialaccount.providers.github")
+    if KEYWARDEN_SOCIAL_APPLE_CONFIGURED:
+        INSTALLED_APPS.append("allauth.socialaccount.providers.apple")
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -65,6 +138,12 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+if KEYWARDEN_SOCIAL_AUTH_ENABLED:
+    MIDDLEWARE.insert(
+        MIDDLEWARE.index("django.contrib.auth.middleware.AuthenticationMiddleware") + 1,
+        "allauth.account.middleware.AccountMiddleware",
+    )
 
 # AUTHENTICATION_BACKENDS = [
 #     "mozilla_django_oidc.auth.OIDCAuthenticationBackend",  # if you enabled OIDC
@@ -244,34 +323,131 @@ MEDIA_ROOT = BASE_DIR/"media"
 
 OIDC_RP_CLIENT_ID = os.getenv("KEYWARDEN_OIDC_CLIENT_ID")
 OIDC_RP_CLIENT_SECRET = os.getenv("KEYWARDEN_OIDC_CLIENT_SECRET")
+OIDC_OP_DISCOVERY_ENDPOINT = os.getenv("KEYWARDEN_OIDC_DISCOVERY_ENDPOINT")
 OIDC_OP_AUTHORIZATION_ENDPOINT = os.getenv("KEYWARDEN_OIDC_AUTHORIZATION_ENDPOINT")
 OIDC_OP_TOKEN_ENDPOINT = os.getenv("KEYWARDEN_OIDC_TOKEN_ENDPOINT")
 OIDC_OP_USER_ENDPOINT = os.getenv("KEYWARDEN_OIDC_USER_ENDPOINT")
 OIDC_OP_JWKS_ENDPOINT = os.getenv("KEYWARDEN_OIDC_JWKS_ENDPOINT")
+OIDC_RP_SIGN_ALGO = os.getenv("KEYWARDEN_OIDC_SIGN_ALGO", "RS256")
+OIDC_RP_SCOPES = os.getenv("KEYWARDEN_OIDC_SCOPES", "openid email profile")
+OIDC_STORE_ACCESS_TOKEN = env_bool("KEYWARDEN_OIDC_STORE_ACCESS_TOKEN", default=False)
+OIDC_CREATE_USER = True
+
+KEYWARDEN_OIDC_PROVIDER_ID = os.getenv("KEYWARDEN_OIDC_PROVIDER_ID", "oidc")
+KEYWARDEN_OIDC_ISSUER = os.getenv("KEYWARDEN_OIDC_ISSUER", "").strip()
+KEYWARDEN_OIDC_EMAIL_CLAIM = os.getenv("KEYWARDEN_OIDC_EMAIL_CLAIM", "email")
+KEYWARDEN_OIDC_EMAIL_VERIFIED_CLAIM = os.getenv("KEYWARDEN_OIDC_EMAIL_VERIFIED_CLAIM", "email_verified")
+KEYWARDEN_OIDC_REQUIRE_VERIFIED_EMAIL = env_bool("KEYWARDEN_OIDC_REQUIRE_VERIFIED_EMAIL", default=True)
+KEYWARDEN_OIDC_USERNAME_CLAIM = os.getenv("KEYWARDEN_OIDC_USERNAME_CLAIM", "preferred_username")
+KEYWARDEN_OIDC_GROUPS_CLAIM = os.getenv("KEYWARDEN_OIDC_GROUPS_CLAIM", "groups")
+KEYWARDEN_OIDC_SYNC_ADMIN_FROM_GROUPS = env_bool("KEYWARDEN_OIDC_SYNC_ADMIN_FROM_GROUPS", default=False)
+KEYWARDEN_OIDC_ADMIN_DEMOTE_ON_MISS = env_bool("KEYWARDEN_OIDC_ADMIN_DEMOTE_ON_MISS", default=False)
+KEYWARDEN_OIDC_ADMIN_GROUPS = env_csv("KEYWARDEN_OIDC_ADMIN_GROUPS")
+
+KEYWARDEN_OIDC_ENABLED = bool(
+    OIDC_RP_CLIENT_ID
+    and OIDC_RP_CLIENT_SECRET
+    and (
+        OIDC_OP_DISCOVERY_ENDPOINT
+        or (
+            OIDC_OP_AUTHORIZATION_ENDPOINT
+            and OIDC_OP_TOKEN_ENDPOINT
+            and OIDC_OP_USER_ENDPOINT
+            and OIDC_OP_JWKS_ENDPOINT
+        )
+    )
+)
+
+KEYWARDEN_SOCIAL_LOGIN_PROVIDERS = []
+if KEYWARDEN_SOCIAL_GOOGLE_CONFIGURED:
+    KEYWARDEN_SOCIAL_LOGIN_PROVIDERS.append(
+        {"id": "google", "name": "Google", "login_url": "/accounts/sso/google/login/"}
+    )
+if KEYWARDEN_SOCIAL_GITHUB_CONFIGURED:
+    KEYWARDEN_SOCIAL_LOGIN_PROVIDERS.append(
+        {"id": "github", "name": "GitHub", "login_url": "/accounts/sso/github/login/"}
+    )
+if KEYWARDEN_SOCIAL_APPLE_CONFIGURED:
+    KEYWARDEN_SOCIAL_LOGIN_PROVIDERS.append(
+        {"id": "apple", "name": "Apple", "login_url": "/accounts/sso/apple/login/"}
+    )
+
+if KEYWARDEN_SOCIAL_AUTH_ENABLED:
+    SITE_ID = int(os.getenv("KEYWARDEN_SITE_ID", "1"))
+    ACCOUNT_EMAIL_REQUIRED = True
+    ACCOUNT_UNIQUE_EMAIL = True
+    ACCOUNT_USERNAME_REQUIRED = False
+    ACCOUNT_AUTHENTICATION_METHOD = "email"
+    SOCIALACCOUNT_AUTO_SIGNUP = True
+    SOCIALACCOUNT_EMAIL_AUTHENTICATION = False
+    SOCIALACCOUNT_ADAPTER = "apps.accounts.social_auth.KeywardenSocialAccountAdapter"
+    SOCIALACCOUNT_LOGIN_ON_GET = True
+    SOCIALACCOUNT_PROVIDERS = {}
+
+    if KEYWARDEN_SOCIAL_GOOGLE_CONFIGURED:
+        SOCIALACCOUNT_PROVIDERS["google"] = {
+            "SCOPE": ["profile", "email"],
+            "APPS": [
+                {
+                    "client_id": KEYWARDEN_SOCIAL_GOOGLE_CLIENT_ID,
+                    "secret": KEYWARDEN_SOCIAL_GOOGLE_CLIENT_SECRET,
+                    "key": "",
+                }
+            ],
+        }
+
+    if KEYWARDEN_SOCIAL_GITHUB_CONFIGURED:
+        SOCIALACCOUNT_PROVIDERS["github"] = {
+            "SCOPE": ["read:user", "user:email"],
+            "APPS": [
+                {
+                    "client_id": KEYWARDEN_SOCIAL_GITHUB_CLIENT_ID,
+                    "secret": KEYWARDEN_SOCIAL_GITHUB_CLIENT_SECRET,
+                    "key": "",
+                }
+            ],
+        }
+
+    if KEYWARDEN_SOCIAL_APPLE_CONFIGURED:
+        SOCIALACCOUNT_PROVIDERS["apple"] = {
+            "SCOPE": ["name", "email"],
+            "APPS": [
+                {
+                    "client_id": KEYWARDEN_SOCIAL_APPLE_CLIENT_ID,
+                    "secret": KEYWARDEN_SOCIAL_APPLE_CLIENT_SECRET,
+                    "key": "",
+                }
+            ],
+        }
+
+KEYWARDEN_SOCIAL_REQUIRE_VERIFIED_EMAIL = env_bool(
+    "KEYWARDEN_SOCIAL_REQUIRE_VERIFIED_EMAIL",
+    default=True,
+)
 
 # Auth mode: native | oidc | hybrid
 AUTH_MODE = os.getenv("KEYWARDEN_AUTH_MODE", "hybrid").lower()
 if AUTH_MODE not in {"native", "oidc", "hybrid"}:
     AUTH_MODE = "hybrid"
+if AUTH_MODE == "oidc" and not KEYWARDEN_OIDC_ENABLED:
+    AUTH_MODE = "native"
 KEYWARDEN_AUTH_MODE = AUTH_MODE
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "guardian.backends.ObjectPermissionBackend",
+]
+if KEYWARDEN_SOCIAL_AUTH_ENABLED:
+    AUTHENTICATION_BACKENDS.append("allauth.account.auth_backends.AuthenticationBackend")
+if KEYWARDEN_OIDC_ENABLED:
+    AUTHENTICATION_BACKENDS.append("apps.accounts.oidc.KeywardenOIDCAuthenticationBackend")
 
 if AUTH_MODE == "oidc":
     # OIDC-only: enforce identity provider logins.
-    AUTHENTICATION_BACKENDS = [
-        "django.contrib.auth.backends.ModelBackend",
-        "guardian.backends.ObjectPermissionBackend",
-        "mozilla_django_oidc.auth.OIDCAuthenticationBackend",
-    ]
     LOGIN_URL = "/oidc/authenticate/"
 else:
-    # native or hybrid -> allow both, native first for precedence
-    AUTHENTICATION_BACKENDS = [
-        "django.contrib.auth.backends.ModelBackend",
-        "guardian.backends.ObjectPermissionBackend",
-        "mozilla_django_oidc.auth.OIDCAuthenticationBackend",
-    ]
     LOGIN_URL = "/accounts/login/"
-LOGOUT_URL = "/oidc/logout/"
+LOGOUT_URL = "/oidc/logout/" if KEYWARDEN_OIDC_ENABLED else "/accounts/logout/"
 LOGIN_REDIRECT_URL = "/servers/"
 LOGOUT_REDIRECT_URL = "/"
 

@@ -33,7 +33,6 @@ class UserDetailOut(Schema):
 
 
 class UserUpdateIn(Schema):
-    email: EmailStr | None = None
     password: str | None = Field(default=None, min_length=8)
     role: Literal["administrator", "operator", "auditor", "user", "admin"] | None = None
     is_active: bool | None = None
@@ -130,27 +129,22 @@ def build_router() -> Router:
 
     @router.patch("/{user_id}", response=UserDetailOut)
     def update_user(request: HttpRequest, user_id: int, payload: UserUpdateIn):
-        """Update user identity, role, password, or activation state.
+        """Update user role, password, or activation state.
 
         Auth: required.
         Permissions: requires `auth.change_user` (admin).
         Side effects: role changes update Keywarden role/group mappings.
+        Security: user email is immutable and cannot be changed.
         Rationale: required for role delegation and account lifecycle control.
         """
         require_perms(request, "auth.change_user")
-        if payload.email is None and payload.password is None and payload.role is None and payload.is_active is None:
+        if payload.password is None and payload.role is None and payload.is_active is None:
             raise HttpError(422, {"detail": "No fields provided."})
         User = get_user_model()
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             raise HttpError(404, "Not Found")
-        if payload.email is not None:
-            email = payload.email.strip().lower()
-            if User.objects.filter(email__iexact=email).exclude(id=user_id).exists():
-                raise HttpError(422, {"email": ["Email already exists."]})
-            user.email = email
-            user.username = email
         if payload.password is not None:
             user.set_password(payload.password)
         if payload.role is not None:

@@ -9,50 +9,92 @@
         <h1 class="text-2xl font-semibold tracking-tight text-gray-900">Welcome back</h1>
         <p class="text-sm text-gray-500">Sign in to manage server access and certificates.</p>
       </div>
+      {% if show_sso_choice %}
+        <div class="mt-6 space-y-3">
+          {% if oidc_enabled %}
+            <a
+              href="{{ oidc_login_url }}"
+              class="inline-flex w-full items-center justify-center rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300"
+            >
+              Login with {{ oidc_provider_label }}
+            </a>
+          {% endif %}
+          {% for provider in social_providers %}
+            <a
+              href="{{ provider.login_url }}"
+              class="inline-flex w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-gray-200"
+            >
+              Login with {{ provider.name }}
+            </a>
+          {% endfor %}
+        </div>
 
-      <form method="post" class="mt-6 space-y-5">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{% url 'servers:dashboard' %}">
-        <div>
-          <label class="mb-2 block text-sm font-medium text-gray-900">Username</label>
-          <input
-            type="text"
-            name="username"
-            autocomplete="username"
-            required
-            class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-          >
-        </div>
-        <div>
-          <label class="mb-2 block text-sm font-medium text-gray-900">Password</label>
-          <input
-            type="password"
-            name="password"
-            autocomplete="current-password"
-            required
-            class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-          >
-        </div>
-        {% if form.errors %}
-          <div class="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">
-            <span class="font-medium">Sign-in failed.</span>
-            <span>Please check your username and password.</span>
+        {% if can_use_native_login %}
+          <div class="mt-6 border-t border-gray-200 pt-6">
+            <a
+              href="{% url 'accounts:login' %}?native=1"
+              class="inline-flex w-full items-center justify-center rounded-lg border border-gray-200 bg-gray-50 px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-gray-200"
+            >
+              Log in with Keywarden
+            </a>
           </div>
         {% endif %}
-        <button
-          type="submit"
-          class="inline-flex w-full items-center justify-center rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300"
-        >
-          Sign in
-        </button>
-      </form>
+      {% else %}
+        <form method="post" class="mt-6 space-y-5">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'servers:dashboard' %}">
+          {% if messages %}
+            {% for message in messages %}
+              <div class="rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+          <div>
+            <label class="mb-2 block text-sm font-medium text-gray-900">Username</label>
+            <input
+              type="text"
+              name="username"
+              autocomplete="username"
+              required
+              class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+            >
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-medium text-gray-900">Password</label>
+            <input
+              type="password"
+              name="password"
+              autocomplete="current-password"
+              required
+              class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+            >
+          </div>
+          {% if form.errors %}
+            <div class="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">
+              <span class="font-medium">Sign-in failed.</span>
+              <span>Please check your username and password.</span>
+            </div>
+          {% endif %}
+          <button
+            type="submit"
+            class="inline-flex w-full items-center justify-center rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300"
+          >
+            Sign in
+          </button>
+        </form>
 
-      <div class="mt-6 border-t border-gray-200 pt-6">
-        <p class="text-sm text-gray-600">
-          Or, if configured, use
-          <a href="/oidc/authenticate/" class="font-medium text-blue-700 hover:underline">OIDC login</a>.
-        </p>
-      </div>
+        {% if oidc_enabled or social_providers %}
+          <div class="mt-6 border-t border-gray-200 pt-6">
+            <a
+              href="{% url 'accounts:login' %}"
+              class="inline-flex w-full items-center justify-center rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-gray-200"
+            >
+              Back to SSO options
+            </a>
+          </div>
+        {% endif %}
+      {% endif %}
     </div>
   </div>
 {% endblock %}

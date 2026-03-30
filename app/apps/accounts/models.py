@@ -7,6 +7,53 @@ from django.db import models, transaction
 from django.utils import timezone
 
 
+class ExternalIdentity(models.Model):
+    class ProviderType(models.TextChoices):
+        OIDC = "oidc", "OIDC"
+        SOCIAL = "social", "Social"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="external_identities",
+    )
+    provider_type = models.CharField(
+        max_length=16,
+        choices=ProviderType.choices,
+        db_index=True,
+    )
+    provider_id = models.CharField(max_length=64, db_index=True)
+    issuer = models.CharField(max_length=255, blank=True)
+    subject = models.CharField(max_length=255)
+    email_at_link = models.EmailField(max_length=254)
+    details = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_login_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "External identity"
+        verbose_name_plural = "External identities"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["provider_type", "provider_id", "subject"],
+                name="acct_extid_prv_subj_uniq",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["user", "provider_type"],
+                name="acct_extid_user_prv_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"{self.provider_type}:{self.provider_id}:{self.subject} -> "
+            f"{self.user_id}"
+        )
+
+
 class ErasureRequest(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -94,6 +141,7 @@ class ErasureRequest(models.Model):
         user.is_superuser = False
         user.last_login = None
         user.set_unusable_password()
+        user._allow_email_update = True
         user.save(
             update_fields=[
                 "username",
