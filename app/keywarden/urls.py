@@ -7,8 +7,10 @@ from keywarden.api import api as ninja_api, api_v1 as ninja_api_v1
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("oidc/", include("mozilla_django_oidc.urls")),
 ]
+
+if getattr(settings, "KEYWARDEN_OIDC_LOGIN_ENABLED", False):
+    urlpatterns.append(path("oidc/", include("mozilla_django_oidc.urls")))
 
 if getattr(settings, "KEYWARDEN_SOCIAL_AUTH_ENABLED", False):
     urlpatterns.append(path("accounts/sso/", include("allauth.urls")))

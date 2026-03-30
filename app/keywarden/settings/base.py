@@ -22,6 +22,12 @@ def env_csv(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
+# Auth mode: native | oidc | hybrid
+KEYWARDEN_AUTH_MODE_REQUESTED = os.getenv("KEYWARDEN_AUTH_MODE", "hybrid").lower()
+if KEYWARDEN_AUTH_MODE_REQUESTED not in {"native", "oidc", "hybrid"}:
+    KEYWARDEN_AUTH_MODE_REQUESTED = "hybrid"
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = os.getenv("KEYWARDEN_SECRET_KEY")
@@ -70,11 +76,14 @@ KEYWARDEN_SOCIAL_APPLE_CONFIGURED = bool(
     and KEYWARDEN_SOCIAL_APPLE_CLIENT_SECRET
 )
 
-KEYWARDEN_SOCIAL_AUTH_ENABLED = any(
+KEYWARDEN_SOCIAL_AUTH_ENABLED = (
+    KEYWARDEN_AUTH_MODE_REQUESTED == "hybrid"
+    and any(
     (
         KEYWARDEN_SOCIAL_GOOGLE_CONFIGURED,
         KEYWARDEN_SOCIAL_GITHUB_CONFIGURED,
         KEYWARDEN_SOCIAL_APPLE_CONFIGURED,
+    )
     )
 )
 
@@ -331,7 +340,8 @@ OIDC_OP_JWKS_ENDPOINT = os.getenv("KEYWARDEN_OIDC_JWKS_ENDPOINT")
 OIDC_RP_SIGN_ALGO = os.getenv("KEYWARDEN_OIDC_SIGN_ALGO", "RS256")
 OIDC_RP_SCOPES = os.getenv("KEYWARDEN_OIDC_SCOPES", "openid email profile")
 OIDC_STORE_ACCESS_TOKEN = env_bool("KEYWARDEN_OIDC_STORE_ACCESS_TOKEN", default=False)
-OIDC_CREATE_USER = True
+KEYWARDEN_OIDC_ALLOW_AUTO_ONBOARDING = env_bool("KEYWARDEN_OIDC_ALLOW_AUTO_ONBOARDING", default=True)
+OIDC_CREATE_USER = KEYWARDEN_OIDC_ALLOW_AUTO_ONBOARDING
 
 KEYWARDEN_OIDC_PROVIDER_ID = os.getenv("KEYWARDEN_OIDC_PROVIDER_ID", "oidc")
 KEYWARDEN_OIDC_ISSUER = os.getenv("KEYWARDEN_OIDC_ISSUER", "").strip()
@@ -340,7 +350,10 @@ KEYWARDEN_OIDC_EMAIL_VERIFIED_CLAIM = os.getenv("KEYWARDEN_OIDC_EMAIL_VERIFIED_C
 KEYWARDEN_OIDC_REQUIRE_VERIFIED_EMAIL = env_bool("KEYWARDEN_OIDC_REQUIRE_VERIFIED_EMAIL", default=True)
 KEYWARDEN_OIDC_USERNAME_CLAIM = os.getenv("KEYWARDEN_OIDC_USERNAME_CLAIM", "preferred_username")
 KEYWARDEN_OIDC_GROUPS_CLAIM = os.getenv("KEYWARDEN_OIDC_GROUPS_CLAIM", "groups")
-KEYWARDEN_OIDC_SYNC_ADMIN_FROM_GROUPS = env_bool("KEYWARDEN_OIDC_SYNC_ADMIN_FROM_GROUPS", default=False)
+KEYWARDEN_OIDC_SYNC_ADMIN_FROM_GROUPS = env_bool(
+    "KEYWARDEN_OIDC_SYNC_ADMIN_FROM_GROUPS",
+    default=(KEYWARDEN_AUTH_MODE_REQUESTED == "oidc"),
+)
 KEYWARDEN_OIDC_ADMIN_DEMOTE_ON_MISS = env_bool("KEYWARDEN_OIDC_ADMIN_DEMOTE_ON_MISS", default=False)
 KEYWARDEN_OIDC_ADMIN_GROUPS = env_csv("KEYWARDEN_OIDC_ADMIN_GROUPS")
 
@@ -358,16 +371,18 @@ KEYWARDEN_OIDC_ENABLED = bool(
     )
 )
 
+KEYWARDEN_OIDC_LOGIN_ENABLED = KEYWARDEN_OIDC_ENABLED and KEYWARDEN_AUTH_MODE_REQUESTED in {"oidc", "hybrid"}
+
 KEYWARDEN_SOCIAL_LOGIN_PROVIDERS = []
-if KEYWARDEN_SOCIAL_GOOGLE_CONFIGURED:
+if KEYWARDEN_SOCIAL_AUTH_ENABLED and KEYWARDEN_SOCIAL_GOOGLE_CONFIGURED:
     KEYWARDEN_SOCIAL_LOGIN_PROVIDERS.append(
         {"id": "google", "name": "Google", "login_url": "/accounts/sso/google/login/"}
     )
-if KEYWARDEN_SOCIAL_GITHUB_CONFIGURED:
+if KEYWARDEN_SOCIAL_AUTH_ENABLED and KEYWARDEN_SOCIAL_GITHUB_CONFIGURED:
     KEYWARDEN_SOCIAL_LOGIN_PROVIDERS.append(
         {"id": "github", "name": "GitHub", "login_url": "/accounts/sso/github/login/"}
     )
-if KEYWARDEN_SOCIAL_APPLE_CONFIGURED:
+if KEYWARDEN_SOCIAL_AUTH_ENABLED and KEYWARDEN_SOCIAL_APPLE_CONFIGURED:
     KEYWARDEN_SOCIAL_LOGIN_PROVIDERS.append(
         {"id": "apple", "name": "Apple", "login_url": "/accounts/sso/apple/login/"}
     )
@@ -378,7 +393,8 @@ if KEYWARDEN_SOCIAL_AUTH_ENABLED:
     ACCOUNT_UNIQUE_EMAIL = True
     ACCOUNT_USERNAME_REQUIRED = False
     ACCOUNT_AUTHENTICATION_METHOD = "email"
-    SOCIALACCOUNT_AUTO_SIGNUP = True
+    KEYWARDEN_SOCIAL_ALLOW_AUTO_ONBOARDING = env_bool("KEYWARDEN_SOCIAL_ALLOW_AUTO_ONBOARDING", default=False)
+    SOCIALACCOUNT_AUTO_SIGNUP = KEYWARDEN_SOCIAL_ALLOW_AUTO_ONBOARDING
     SOCIALACCOUNT_EMAIL_AUTHENTICATION = False
     SOCIALACCOUNT_ADAPTER = "apps.accounts.social_auth.KeywardenSocialAccountAdapter"
     SOCIALACCOUNT_LOGIN_ON_GET = True
@@ -426,28 +442,37 @@ KEYWARDEN_SOCIAL_REQUIRE_VERIFIED_EMAIL = env_bool(
 )
 
 # Auth mode: native | oidc | hybrid
-AUTH_MODE = os.getenv("KEYWARDEN_AUTH_MODE", "hybrid").lower()
-if AUTH_MODE not in {"native", "oidc", "hybrid"}:
-    AUTH_MODE = "hybrid"
+AUTH_MODE = KEYWARDEN_AUTH_MODE_REQUESTED
 if AUTH_MODE == "oidc" and not KEYWARDEN_OIDC_ENABLED:
     AUTH_MODE = "native"
 KEYWARDEN_AUTH_MODE = AUTH_MODE
 
-AUTHENTICATION_BACKENDS = [
-    "django.contrib.auth.backends.ModelBackend",
-    "guardian.backends.ObjectPermissionBackend",
-]
-if KEYWARDEN_SOCIAL_AUTH_ENABLED:
-    AUTHENTICATION_BACKENDS.append("allauth.account.auth_backends.AuthenticationBackend")
-if KEYWARDEN_OIDC_ENABLED:
-    AUTHENTICATION_BACKENDS.append("apps.accounts.oidc.KeywardenOIDCAuthenticationBackend")
+if AUTH_MODE == "oidc":
+    AUTHENTICATION_BACKENDS = [
+        "apps.accounts.oidc.KeywardenOIDCAuthenticationBackend",
+        "guardian.backends.ObjectPermissionBackend",
+    ]
+elif AUTH_MODE == "hybrid":
+    AUTHENTICATION_BACKENDS = [
+        "django.contrib.auth.backends.ModelBackend",
+        "guardian.backends.ObjectPermissionBackend",
+    ]
+    if KEYWARDEN_SOCIAL_AUTH_ENABLED:
+        AUTHENTICATION_BACKENDS.append("allauth.account.auth_backends.AuthenticationBackend")
+    if KEYWARDEN_OIDC_ENABLED:
+        AUTHENTICATION_BACKENDS.append("apps.accounts.oidc.KeywardenOIDCAuthenticationBackend")
+else:
+    AUTHENTICATION_BACKENDS = [
+        "django.contrib.auth.backends.ModelBackend",
+        "guardian.backends.ObjectPermissionBackend",
+    ]
 
 if AUTH_MODE == "oidc":
     # OIDC-only: enforce identity provider logins.
     LOGIN_URL = "/oidc/authenticate/"
 else:
     LOGIN_URL = "/accounts/login/"
-LOGOUT_URL = "/oidc/logout/" if KEYWARDEN_OIDC_ENABLED else "/accounts/logout/"
+LOGOUT_URL = "/oidc/logout/" if AUTH_MODE in {"oidc", "hybrid"} and KEYWARDEN_OIDC_ENABLED else "/accounts/logout/"
 LOGIN_REDIRECT_URL = "/servers/"
 LOGOUT_REDIRECT_URL = "/"
 

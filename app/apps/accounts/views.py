@@ -133,7 +133,7 @@ def profile(request):
   context = {
     "user": request.user,
     "auth_mode": getattr(settings, "KEYWARDEN_AUTH_MODE", "hybrid"),
-    "oidc_enabled": bool(getattr(settings, "KEYWARDEN_OIDC_ENABLED", False)),
+    "oidc_enabled": bool(getattr(settings, "KEYWARDEN_OIDC_LOGIN_ENABLED", False)),
     "oidc_identity": oidc_identity,
     "oidc_provider_id": getattr(settings, "KEYWARDEN_OIDC_PROVIDER_ID", "oidc"),
     "oidc_issuer": getattr(settings, "KEYWARDEN_OIDC_ISSUER", ""),
@@ -149,25 +149,32 @@ def profile(request):
 
 def login_view(request):
   auth_mode = getattr(settings, "KEYWARDEN_AUTH_MODE", "hybrid")
-  if auth_mode == "oidc":
+  oidc_login_enabled = bool(getattr(settings, "KEYWARDEN_OIDC_LOGIN_ENABLED", False))
+  social_providers = (
+    getattr(settings, "KEYWARDEN_SOCIAL_LOGIN_PROVIDERS", [])
+    if auth_mode == "hybrid"
+    else []
+  )
+
+  if auth_mode == "oidc" and oidc_login_enabled:
     return redirect("/oidc/authenticate/")
 
   has_sso_options = bool(
-    getattr(settings, "KEYWARDEN_OIDC_ENABLED", False)
-    or getattr(settings, "KEYWARDEN_SOCIAL_LOGIN_PROVIDERS", [])
+    oidc_login_enabled
+    or social_providers
   )
   show_native_login = (
     request.method == "POST"
     or request.GET.get("native") == "1"
-    or (auth_mode == "native" and not has_sso_options)
+    or auth_mode == "native"
   )
 
   # native or hybrid -> render Django's built-in login view
   return auth_views.LoginView.as_view(
     template_name="accounts/login.html",
     extra_context={
-      "social_providers": getattr(settings, "KEYWARDEN_SOCIAL_LOGIN_PROVIDERS", []),
-      "oidc_enabled": bool(getattr(settings, "KEYWARDEN_OIDC_ENABLED", False)),
+      "social_providers": social_providers,
+      "oidc_enabled": oidc_login_enabled,
       "oidc_login_url": "/oidc/authenticate/",
       "oidc_provider_label": _oidc_provider_label(),
       "show_native_login": show_native_login,

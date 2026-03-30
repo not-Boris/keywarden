@@ -61,6 +61,13 @@ class KeywardenSocialAccountAdapter(DefaultSocialAccountAdapter):
         if user:
             sociallogin.connect(request, user)
             self._sync_identity(user, sociallogin)
+            return
+
+        if not getattr(settings, "KEYWARDEN_SOCIAL_ALLOW_AUTO_ONBOARDING", False):
+            self._reject(
+                request,
+                "Social auto-onboarding is disabled. Ask an administrator to create/link your account.",
+            )
 
     def populate_user(self, request, sociallogin, data):
         user = super().populate_user(request, sociallogin, data)
