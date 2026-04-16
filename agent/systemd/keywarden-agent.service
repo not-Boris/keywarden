@@ -1,0 +1,23 @@
+[Unit]
+Description=Keywarden Agent
+Documentation=https://git.ntbx.io/boris/keywarden
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+EnvironmentFile=-/etc/default/keywarden-agent
+EnvironmentFile=-/etc/sysconfig/keywarden-agent
+ExecStart=/usr/local/bin/keywarden-agent -config /etc/keywarden/agent.json
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+
+[Install]
+WantedBy=multi-user.target
