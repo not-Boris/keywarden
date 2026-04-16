@@ -100,14 +100,28 @@
                   </dd>
                 </div>
               </dl>
-              <div class="mt-5 flex items-center justify-between border-t border-gray-100 pt-4 text-xs text-gray-500">
-                <span>Certificates and access</span>
+              <div class="mt-5 border-t border-gray-100 pt-4">
                 {% if item.access.can_users %}
-                  <a href="{% url 'servers:detail' item.server.id %}" class="font-semibold text-blue-700 hover:underline">View details</a>
+                  <a
+                    href="{% url 'servers:detail' item.server.id %}"
+                    class="inline-flex w-full items-center justify-center rounded-full bg-blue-700 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-800"
+                  >
+                    Open details
+                  </a>
                 {% elif item.access.can_logs %}
-                  <a href="{% url 'servers:audit' item.server.id %}" class="font-semibold text-blue-700 hover:underline">Open audit</a>
+                  <a
+                    href="{% url 'servers:audit' item.server.id %}"
+                    class="inline-flex w-full items-center justify-center rounded-full bg-blue-700 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-800"
+                  >
+                    Open audit
+                  </a>
                 {% elif item.access.can_shell %}
-                  <a href="{% url 'servers:shell' item.server.id %}" class="font-semibold text-blue-700 hover:underline">Open shell</a>
+                  <a
+                    href="{% url 'servers:shell' item.server.id %}"
+                    class="inline-flex w-full items-center justify-center rounded-full bg-blue-700 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-800"
+                  >
+                    Open shell
+                  </a>
                 {% endif %}
               </div>
             {% else %}

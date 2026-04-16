@@ -36,4 +36,8 @@ python manage.py collectstatic --noinput
 python manage.py migrate --noinput
 python manage.py ensure_admin
 
+# Ensure application log directory exists and is writable by the Django runtime user.
+mkdir -p /var/log/keywarden
+chown -R djangouser:djangouser /var/log/keywarden || true
+
 exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf

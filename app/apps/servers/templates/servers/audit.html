@@ -6,37 +6,37 @@
 {% block extra_head %}
   <style>
     .ak-chart-card {
-      border-color: #1f2937;
-      background: radial-gradient(120% 140% at 0% 0%, #1e293b 0%, #111827 50%, #0b1220 100%);
-      color: #e5e7eb;
+      border-color: var(--kw-chart-card-border);
+      background: var(--kw-chart-card-bg);
+      color: var(--kw-chart-text);
       box-shadow: 0 10px 30px rgba(2, 6, 23, 0.35);
     }
 
     .ak-chart-title {
-      color: #f3f4f6;
+      color: var(--kw-chart-text);
       font-weight: 700;
       letter-spacing: 0.01em;
     }
 
     .ak-chart-subtitle {
-      color: #94a3b8;
+      color: var(--kw-chart-subtext);
     }
 
     .ak-chart-badge {
-      border: 1px solid rgba(100, 116, 139, 0.45);
-      background: rgba(15, 23, 42, 0.65);
-      color: #e2e8f0;
+      border: 1px solid var(--kw-chart-badge-border);
+      background: var(--kw-chart-badge-bg);
+      color: var(--kw-chart-badge-text);
     }
 
     .ak-chart-canvas-wrap {
-      border: 1px solid rgba(71, 85, 105, 0.35);
-      background: rgba(2, 6, 23, 0.32);
+      border: 1px solid var(--kw-chart-canvas-border);
+      background: var(--kw-chart-canvas-bg);
       border-radius: 14px;
       padding: 0.6rem 0.75rem;
     }
 
     .ak-chart-empty {
-      color: #94a3b8;
+      color: var(--kw-chart-empty-text);
     }
   </style>
 {% endblock %}
@@ -230,6 +230,7 @@
       var panelUrl = "{{ audit_panel_url }}";
       var lineLimitSelect = document.getElementById("js-audit-line-limit");
       var chartsInitialized = false;
+      var chartInstances = [];
       var auditPath = "{{ request.path }}";
 
       function parseChartData(scriptId) {
@@ -244,12 +245,48 @@
         }
       }
 
+      function getResolvedTheme() {
+        return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      }
+
+      function getChartPalette() {
+        if (getResolvedTheme() === "dark") {
+          return {
+            legend: "#e2e8f0",
+            tickPrimary: "#94a3b8",
+            tickSecondary: "#cbd5e1",
+            gridStrong: "rgba(148, 163, 184, 0.12)",
+            gridSoft: "rgba(148, 163, 184, 0.08)",
+            tooltipBg: "rgba(15, 23, 42, 0.94)",
+            tooltipBorder: "rgba(148, 163, 184, 0.35)",
+            tooltipTitle: "#e2e8f0",
+            tooltipBody: "#cbd5e1"
+          };
+        }
+        return {
+          legend: "#0f172a",
+          tickPrimary: "#64748b",
+          tickSecondary: "#334155",
+          gridStrong: "rgba(148, 163, 184, 0.24)",
+          gridSoft: "rgba(148, 163, 184, 0.16)",
+          tooltipBg: "rgba(248, 250, 252, 0.98)",
+          tooltipBorder: "rgba(100, 116, 139, 0.35)",
+          tooltipTitle: "#0f172a",
+          tooltipBody: "#334155"
+        };
+      }
+
       function renderBarChart(canvasId, emptyId, data, options) {
         var canvas = document.getElementById(canvasId);
         var emptyNode = document.getElementById(emptyId);
         var chartOpts = options || {};
+        var palette = getChartPalette();
         if (!canvas) {
           return;
+        }
+        if (canvas._kwChart) {
+          canvas._kwChart.destroy();
+          canvas._kwChart = null;
         }
         if (!window.Chart || !data || !Array.isArray(data.labels) || data.labels.length === 0) {
           canvas.classList.add("hidden");
@@ -275,7 +312,7 @@
             }
           ]
         };
-        new window.Chart(canvas.getContext("2d"), {
+        var chart = new window.Chart(canvas.getContext("2d"), {
           type: "bar",
           data: chartData,
           options: {
@@ -288,7 +325,7 @@
                 position: "top",
                 align: "center",
                 labels: {
-                  color: "#e2e8f0",
+                  color: palette.legend,
                   boxWidth: 18,
                   boxHeight: 8,
                   font: {
@@ -298,11 +335,11 @@
                 }
               },
               tooltip: {
-                backgroundColor: "rgba(15, 23, 42, 0.94)",
-                borderColor: "rgba(148, 163, 184, 0.35)",
+                backgroundColor: palette.tooltipBg,
+                borderColor: palette.tooltipBorder,
                 borderWidth: 1,
-                titleColor: "#e2e8f0",
-                bodyColor: "#cbd5e1",
+                titleColor: palette.tooltipTitle,
+                bodyColor: palette.tooltipBody,
                 callbacks: {
                   label: function (ctx) {
                     var isHorizontal = chartOpts.indexAxis === "y";
@@ -317,19 +354,19 @@
                 beginAtZero: true,
                 ticks: {
                   precision: 0,
-                  color: "#94a3b8"
+                  color: palette.tickPrimary
                 },
                 grid: {
-                  color: "rgba(148, 163, 184, 0.12)",
+                  color: palette.gridStrong,
                   drawBorder: false
                 }
               },
               y: {
                 ticks: {
-                  color: "#cbd5e1"
+                  color: palette.tickSecondary
                 },
                 grid: {
-                  color: "rgba(148, 163, 184, 0.08)",
+                  color: palette.gridSoft,
                   drawBorder: false
                 }
               }
@@ -354,11 +391,27 @@
             }
           }
         });
+        canvas._kwChart = chart;
+        chartInstances.push(chart);
       }
 
-      function initializeCharts() {
-        if (chartsInitialized) {
+      function destroyCharts() {
+        for (var i = 0; i < chartInstances.length; i += 1) {
+          try {
+            chartInstances[i].destroy();
+          } catch (err) {
+            // noop
+          }
+        }
+        chartInstances = [];
+      }
+
+      function initializeCharts(force) {
+        if (chartsInitialized && !force) {
           return;
+        }
+        if (force) {
+          destroyCharts();
         }
         chartsInitialized = true;
         renderBarChart("js-login-chart", "js-login-chart-empty", parseChartData("js-login-chart-data"), {
@@ -511,6 +564,15 @@
         });
       }
       setSubpage("{{ audit_subpage }}", false);
+
+      window.addEventListener("keywarden:theme-mode", function () {
+        if (chartsSection && !chartsSection.classList.contains("hidden")) {
+          initializeCharts(true);
+          return;
+        }
+        destroyCharts();
+        chartsInitialized = false;
+      });
 
       if (addButton) {
         addButton.addEventListener("click", function () {

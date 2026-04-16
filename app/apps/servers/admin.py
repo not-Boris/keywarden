@@ -1,10 +1,15 @@
 from django.contrib import admin
 from django.utils.html import format_html
+
+try:
+    from unfold.admin import ModelAdmin as UnfoldModelAdmin
+except ImportError:
+    UnfoldModelAdmin = admin.ModelAdmin
+
 try:
     from unfold.contrib.guardian.admin import GuardedModelAdmin
 except ImportError:  # Fallback for older Unfold builds without guardian admin shim.
     from guardian.admin import GuardedModelAdmin as GuardianGuardedModelAdmin
-    from unfold.admin import ModelAdmin as UnfoldModelAdmin
 
     class GuardedModelAdmin(GuardianGuardedModelAdmin, UnfoldModelAdmin):
         pass
@@ -65,12 +70,19 @@ class ServerAdmin(GuardedModelAdmin):
 
 
 @admin.register(EnrollmentToken)
-class EnrollmentTokenAdmin(admin.ModelAdmin):
+class EnrollmentTokenAdmin(UnfoldModelAdmin):
     list_display = ("token", "created_at", "expires_at", "used_at", "server")
     list_filter = ("created_at", "used_at")
     search_fields = ("token", "server__display_name", "server__hostname")
     readonly_fields = ("token", "created_at", "used_at", "server", "created_by")
     fields = ("token", "expires_at", "created_by", "created_at", "used_at", "server")
+
+    def get_fields(self, request, obj=None):
+        # Keep the add form minimal and deterministic in Unfold: token and
+        # metadata are generated server-side and shown on the change view.
+        if obj is None:
+            return ("expires_at",)
+        return self.fields
 
     def save_model(self, request, obj, form, change) -> None:
         if not obj.pk:
