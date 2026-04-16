@@ -1,0 +1,8 @@
+Hello {{ user.get_username }},
+
+Verify your Keywarden email by opening this link:
+{{ verification_link }}
+
+This verification link expires in {{ expires_seconds }} seconds.
+
+If you did not request this verification email, you can ignore it.

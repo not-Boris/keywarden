@@ -3,6 +3,16 @@
 {% block title %}Profile • Keywarden{% endblock %}
 
 {% block content %}
+  {% if messages %}
+    <div class="mb-4 space-y-2">
+      {% for message in messages %}
+        <div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800" role="alert">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)] lg:items-start">
     <div class="space-y-6">
       <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -233,6 +243,74 @@
 
       <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div class="space-y-2">
+          <h2 class="text-base font-semibold text-gray-900">Native account security</h2>
+          <p class="text-sm text-gray-500">Password reset and email verification for Keywarden-native credentials.</p>
+        </div>
+        {% if native_security_enabled %}
+          <div class="mt-4 space-y-4">
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-sm font-semibold text-gray-900">Email verification</span>
+                {% if native_account_security and native_account_security.email_verified %}
+                  <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">Verified</span>
+                {% else %}
+                  <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">Unverified</span>
+                {% endif %}
+              </div>
+              {% if email_verification_enabled %}
+                {% if native_account_security and native_account_security.email_verified %}
+                  <p class="mt-2 text-xs text-gray-600">
+                    Verified at {{ native_account_security.email_verified_at|date:"M j, Y H:i" }}.
+                  </p>
+                {% else %}
+                  <p class="mt-2 text-xs text-gray-600">
+                    Send a verification link to {{ user.email }}.
+                  </p>
+                  <form method="post" class="mt-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="send_email_verification">
+                    <button
+                      type="submit"
+                      class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    >
+                      Send verification email
+                    </button>
+                  </form>
+                {% endif %}
+              {% else %}
+                <p class="mt-2 text-xs text-gray-600">Email verification is disabled in this environment.</p>
+              {% endif %}
+            </div>
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p class="text-sm font-semibold text-gray-900">Password reset</p>
+              <p class="mt-2 text-xs text-gray-600">
+                Reset your Keywarden-native password via secure email token flow.
+              </p>
+              <a
+                href="{% url 'accounts:password_reset' %}"
+                class="mt-3 inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+              >
+                Start password reset
+              </a>
+            </div>
+          </div>
+        {% else %}
+          <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p class="text-sm text-gray-700">
+              Native password reset and local email verification are disabled because this account uses SSO.
+            </p>
+            <p class="mt-2 text-xs text-gray-600">
+              Manage password and email verification in your identity provider.
+              {% if idp_account_portal_url %}
+                <a href="{{ idp_account_portal_url }}" class="font-semibold text-blue-700 hover:underline">Open IdP account portal</a>.
+              {% endif %}
+            </p>
+          </div>
+        {% endif %}
+      </section>
+
+      <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div class="space-y-2">
           <h2 class="text-base font-semibold text-gray-900">Single Sign-On</h2>
           <p class="text-sm text-gray-500">Manage how you authenticate with external providers.</p>
         </div>
@@ -309,53 +387,68 @@
 
           <article class="overflow-hidden rounded-xl border border-gray-200">
             <div class="flex items-center justify-between bg-gray-50 px-4 py-3">
-              <h3 class="text-sm font-semibold text-gray-900">Social Providers</h3>
-              <span class="text-xs text-gray-500">GitHub, Google, Apple and more</span>
+              <h3 class="text-sm font-semibold text-gray-900">GitHub</h3>
+              {% if github_identity %}
+                <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Linked</span>
+              {% elif github_social_configured %}
+                <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Ready to link</span>
+              {% else %}
+                <span class="inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-semibold text-gray-700">Unavailable</span>
+              {% endif %}
             </div>
-            <div class="divide-y divide-gray-100">
-              {% for provider in social_provider_cards %}
-                <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                  <div class="min-w-0">
-                    <p class="text-sm font-semibold text-gray-900">{{ provider.name }}</p>
-                    {% if provider.linked and provider.identity %}
-                      <p class="text-xs text-gray-600">
-                        Linked as {{ provider.identity.email_at_link }}
-                        {% if provider.identity.last_login_at %}• last login {{ provider.identity.last_login_at|date:"M j, Y H:i" }}{% endif %}
-                      </p>
-                    {% elif provider.configured %}
-                      <p class="text-xs text-gray-600">Configured and ready to link.</p>
-                    {% else %}
-                      <p class="text-xs text-gray-500">Placeholder. Configure provider credentials to enable linking.</p>
-                    {% endif %}
+            <div class="space-y-3 p-4">
+              {% if github_identity %}
+                <dl class="grid grid-cols-1 gap-2 text-xs text-gray-600">
+                  <div class="grid grid-cols-[96px,1fr] items-start gap-2">
+                    <dt class="font-semibold text-gray-700">Linked email</dt>
+                    <dd>{{ github_identity.email_at_link }}</dd>
                   </div>
-                  <div class="flex items-center gap-2">
-                    {% if provider.linked %}
-                      <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Linked</span>
-                    {% elif provider.configured %}
-                      <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Ready</span>
-                    {% else %}
-                      <span class="inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-semibold text-gray-700">Placeholder</span>
-                    {% endif %}
-
-                    {% if provider.configured %}
-                      <a
-                        href="{{ provider.login_url }}"
-                        class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                      >
-                        {% if provider.linked %}Re-link{% else %}Link{% endif %}
-                      </a>
-                    {% else %}
-                      <button
-                        type="button"
-                        disabled
-                        class="inline-flex cursor-not-allowed items-center rounded-lg border border-gray-200 bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-500"
-                      >
-                        Configure
-                      </button>
-                    {% endif %}
+                  <div class="grid grid-cols-[96px,1fr] items-start gap-2">
+                    <dt class="font-semibold text-gray-700">Subject</dt>
+                    <dd class="break-all font-mono">{{ github_identity.subject }}</dd>
                   </div>
+                  {% if github_identity.last_login_at %}
+                    <div class="grid grid-cols-[96px,1fr] items-start gap-2">
+                      <dt class="font-semibold text-gray-700">Last login</dt>
+                      <dd>{{ github_identity.last_login_at|date:"M j, Y H:i" }}</dd>
+                    </div>
+                  {% endif %}
+                </dl>
+                <div class="flex flex-wrap items-center gap-2">
+                  {% if github_social_connect_url %}
+                    <a
+                      href="{{ github_social_connect_url }}"
+                      class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    >
+                      Re-link GitHub
+                    </a>
+                  {% endif %}
+                  <form method="post" class="inline-flex">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="unlink_github">
+                    <button
+                      type="submit"
+                      class="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-300"
+                    >
+                      Unlink GitHub
+                    </button>
+                  </form>
                 </div>
-              {% endfor %}
+              {% elif github_social_configured %}
+                <p class="text-sm text-gray-600">
+                  Link GitHub while signed in. GitHub login is only available after linking to an existing Keywarden account.
+                </p>
+                <a
+                  href="{{ github_social_connect_url }}"
+                  class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                >
+                  Link GitHub
+                </a>
+              {% else %}
+                <p class="text-sm text-gray-600">
+                  GitHub authentication is not configured in this environment.
+                </p>
+              {% endif %}
             </div>
           </article>
         </div>

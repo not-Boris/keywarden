@@ -39,52 +39,43 @@ CSRF_TRUSTED_ORIGINS = [
     for origin in os.getenv("KEYWARDEN_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+KEYWARDEN_IDP_ACCOUNT_PORTAL_URL = os.getenv("KEYWARDEN_IDP_ACCOUNT_PORTAL_URL", "").strip()
 
-KEYWARDEN_SOCIAL_GOOGLE_CLIENT_ID = os.getenv("KEYWARDEN_SOCIAL_GOOGLE_CLIENT_ID", "").strip()
-KEYWARDEN_SOCIAL_GOOGLE_CLIENT_SECRET = os.getenv("KEYWARDEN_SOCIAL_GOOGLE_CLIENT_SECRET", "").strip()
+EMAIL_BACKEND = os.getenv(
+    "KEYWARDEN_EMAIL_BACKEND",
+    "django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = os.getenv("KEYWARDEN_EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.getenv("KEYWARDEN_EMAIL_PORT", "25"))
+EMAIL_HOST_USER = os.getenv("KEYWARDEN_EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("KEYWARDEN_EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("KEYWARDEN_EMAIL_USE_TLS", default=False)
+EMAIL_USE_SSL = env_bool("KEYWARDEN_EMAIL_USE_SSL", default=False)
+DEFAULT_FROM_EMAIL = os.getenv("KEYWARDEN_DEFAULT_FROM_EMAIL", "no-reply@localhost")
+SERVER_EMAIL = os.getenv("KEYWARDEN_SERVER_EMAIL", DEFAULT_FROM_EMAIL)
+KEYWARDEN_EMAIL_VERIFICATION_ENABLED = env_bool("KEYWARDEN_EMAIL_VERIFICATION_ENABLED", default=True)
+KEYWARDEN_EMAIL_VERIFICATION_TOKEN_MAX_AGE_SECONDS = int(
+    os.getenv("KEYWARDEN_EMAIL_VERIFICATION_TOKEN_MAX_AGE_SECONDS", "86400")
+)
+KEYWARDEN_EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS = int(
+    os.getenv("KEYWARDEN_EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS", "300")
+)
+
 KEYWARDEN_SOCIAL_GITHUB_CLIENT_ID = os.getenv("KEYWARDEN_SOCIAL_GITHUB_CLIENT_ID", "").strip()
 KEYWARDEN_SOCIAL_GITHUB_CLIENT_SECRET = os.getenv("KEYWARDEN_SOCIAL_GITHUB_CLIENT_SECRET", "").strip()
-KEYWARDEN_SOCIAL_APPLE_CLIENT_ID = os.getenv("KEYWARDEN_SOCIAL_APPLE_CLIENT_ID", "").strip()
-KEYWARDEN_SOCIAL_APPLE_CLIENT_SECRET = os.getenv("KEYWARDEN_SOCIAL_APPLE_CLIENT_SECRET", "").strip()
-
-KEYWARDEN_SOCIAL_GOOGLE_ENABLED = env_bool(
-    "KEYWARDEN_SOCIAL_GOOGLE_ENABLED",
-    default=bool(KEYWARDEN_SOCIAL_GOOGLE_CLIENT_ID and KEYWARDEN_SOCIAL_GOOGLE_CLIENT_SECRET),
-)
 KEYWARDEN_SOCIAL_GITHUB_ENABLED = env_bool(
     "KEYWARDEN_SOCIAL_GITHUB_ENABLED",
     default=bool(KEYWARDEN_SOCIAL_GITHUB_CLIENT_ID and KEYWARDEN_SOCIAL_GITHUB_CLIENT_SECRET),
-)
-KEYWARDEN_SOCIAL_APPLE_ENABLED = env_bool(
-    "KEYWARDEN_SOCIAL_APPLE_ENABLED",
-    default=bool(KEYWARDEN_SOCIAL_APPLE_CLIENT_ID and KEYWARDEN_SOCIAL_APPLE_CLIENT_SECRET),
-)
-
-KEYWARDEN_SOCIAL_GOOGLE_CONFIGURED = bool(
-    KEYWARDEN_SOCIAL_GOOGLE_ENABLED
-    and KEYWARDEN_SOCIAL_GOOGLE_CLIENT_ID
-    and KEYWARDEN_SOCIAL_GOOGLE_CLIENT_SECRET
 )
 KEYWARDEN_SOCIAL_GITHUB_CONFIGURED = bool(
     KEYWARDEN_SOCIAL_GITHUB_ENABLED
     and KEYWARDEN_SOCIAL_GITHUB_CLIENT_ID
     and KEYWARDEN_SOCIAL_GITHUB_CLIENT_SECRET
 )
-KEYWARDEN_SOCIAL_APPLE_CONFIGURED = bool(
-    KEYWARDEN_SOCIAL_APPLE_ENABLED
-    and KEYWARDEN_SOCIAL_APPLE_CLIENT_ID
-    and KEYWARDEN_SOCIAL_APPLE_CLIENT_SECRET
-)
 
 KEYWARDEN_SOCIAL_AUTH_ENABLED = (
     KEYWARDEN_AUTH_MODE_REQUESTED == "hybrid"
-    and any(
-    (
-        KEYWARDEN_SOCIAL_GOOGLE_CONFIGURED,
-        KEYWARDEN_SOCIAL_GITHUB_CONFIGURED,
-        KEYWARDEN_SOCIAL_APPLE_CONFIGURED,
-    )
-    )
+    and KEYWARDEN_SOCIAL_GITHUB_CONFIGURED
 )
 
 # Default to secure cookies and respect TLS termination headers.
@@ -129,12 +120,8 @@ if KEYWARDEN_SOCIAL_AUTH_ENABLED:
             "allauth.socialaccount",
         ]
     )
-    if KEYWARDEN_SOCIAL_GOOGLE_CONFIGURED:
-        INSTALLED_APPS.append("allauth.socialaccount.providers.google")
     if KEYWARDEN_SOCIAL_GITHUB_CONFIGURED:
         INSTALLED_APPS.append("allauth.socialaccount.providers.github")
-    if KEYWARDEN_SOCIAL_APPLE_CONFIGURED:
-        INSTALLED_APPS.append("allauth.socialaccount.providers.apple")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -392,17 +379,14 @@ KEYWARDEN_OIDC_ENABLED = bool(
 KEYWARDEN_OIDC_LOGIN_ENABLED = KEYWARDEN_OIDC_ENABLED and KEYWARDEN_AUTH_MODE_REQUESTED in {"oidc", "hybrid"}
 
 KEYWARDEN_SOCIAL_LOGIN_PROVIDERS = []
-if KEYWARDEN_SOCIAL_AUTH_ENABLED and KEYWARDEN_SOCIAL_GOOGLE_CONFIGURED:
-    KEYWARDEN_SOCIAL_LOGIN_PROVIDERS.append(
-        {"id": "google", "name": "Google", "login_url": "/accounts/sso/google/login/"}
-    )
 if KEYWARDEN_SOCIAL_AUTH_ENABLED and KEYWARDEN_SOCIAL_GITHUB_CONFIGURED:
     KEYWARDEN_SOCIAL_LOGIN_PROVIDERS.append(
-        {"id": "github", "name": "GitHub", "login_url": "/accounts/sso/github/login/"}
-    )
-if KEYWARDEN_SOCIAL_AUTH_ENABLED and KEYWARDEN_SOCIAL_APPLE_CONFIGURED:
-    KEYWARDEN_SOCIAL_LOGIN_PROVIDERS.append(
-        {"id": "apple", "name": "Apple", "login_url": "/accounts/sso/apple/login/"}
+        {
+            "id": "github",
+            "name": "GitHub",
+            "login_url": "/accounts/sso/github/login/",
+            "connect_url": "/accounts/sso/github/login/?process=connect",
+        }
     )
 
 if KEYWARDEN_SOCIAL_AUTH_ENABLED:
@@ -411,24 +395,13 @@ if KEYWARDEN_SOCIAL_AUTH_ENABLED:
     ACCOUNT_UNIQUE_EMAIL = True
     ACCOUNT_USERNAME_REQUIRED = False
     ACCOUNT_AUTHENTICATION_METHOD = "email"
-    KEYWARDEN_SOCIAL_ALLOW_AUTO_ONBOARDING = env_bool("KEYWARDEN_SOCIAL_ALLOW_AUTO_ONBOARDING", default=False)
-    SOCIALACCOUNT_AUTO_SIGNUP = KEYWARDEN_SOCIAL_ALLOW_AUTO_ONBOARDING
+    # Social identities can only be linked to an existing Keywarden account.
+    KEYWARDEN_SOCIAL_ALLOW_AUTO_ONBOARDING = False
+    SOCIALACCOUNT_AUTO_SIGNUP = False
     SOCIALACCOUNT_EMAIL_AUTHENTICATION = False
     SOCIALACCOUNT_ADAPTER = "apps.accounts.social_auth.KeywardenSocialAccountAdapter"
     SOCIALACCOUNT_LOGIN_ON_GET = True
     SOCIALACCOUNT_PROVIDERS = {}
-
-    if KEYWARDEN_SOCIAL_GOOGLE_CONFIGURED:
-        SOCIALACCOUNT_PROVIDERS["google"] = {
-            "SCOPE": ["profile", "email"],
-            "APPS": [
-                {
-                    "client_id": KEYWARDEN_SOCIAL_GOOGLE_CLIENT_ID,
-                    "secret": KEYWARDEN_SOCIAL_GOOGLE_CLIENT_SECRET,
-                    "key": "",
-                }
-            ],
-        }
 
     if KEYWARDEN_SOCIAL_GITHUB_CONFIGURED:
         SOCIALACCOUNT_PROVIDERS["github"] = {
@@ -437,18 +410,6 @@ if KEYWARDEN_SOCIAL_AUTH_ENABLED:
                 {
                     "client_id": KEYWARDEN_SOCIAL_GITHUB_CLIENT_ID,
                     "secret": KEYWARDEN_SOCIAL_GITHUB_CLIENT_SECRET,
-                    "key": "",
-                }
-            ],
-        }
-
-    if KEYWARDEN_SOCIAL_APPLE_CONFIGURED:
-        SOCIALACCOUNT_PROVIDERS["apple"] = {
-            "SCOPE": ["name", "email"],
-            "APPS": [
-                {
-                    "client_id": KEYWARDEN_SOCIAL_APPLE_CLIENT_ID,
-                    "secret": KEYWARDEN_SOCIAL_APPLE_CLIENT_SECRET,
                     "key": "",
                 }
             ],

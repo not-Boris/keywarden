@@ -2,7 +2,7 @@
 
 This guide configures:
 - OIDC client login (Authentik, Authelia, Keycloak, or other OIDC IdP)
-- Social login (Google, GitHub, Apple)
+- Social login (GitHub)
 
 Security model implemented by Keywarden:
 - External identities are mapped by immutable provider subject (`sub`/`uid`) and provider ID.
@@ -120,25 +120,17 @@ KEYWARDEN_OIDC_ISSUER=https://id.example.com/realms/main
 KEYWARDEN_OIDC_GROUPS_CLAIM=groups
 ```
 
-## 5. Social providers
+## 5. GitHub social provider
 
-Enable providers by credentials (or explicit `*_ENABLED=true`).
+Enable GitHub by credentials (or explicit `*_ENABLED=true`).
 
 ```env
 KEYWARDEN_SITE_ID=1
 KEYWARDEN_SOCIAL_REQUIRE_VERIFIED_EMAIL=true
 
-KEYWARDEN_SOCIAL_GOOGLE_ENABLED=true
-KEYWARDEN_SOCIAL_GOOGLE_CLIENT_ID=<google-client-id>
-KEYWARDEN_SOCIAL_GOOGLE_CLIENT_SECRET=<google-secret>
-
 KEYWARDEN_SOCIAL_GITHUB_ENABLED=true
 KEYWARDEN_SOCIAL_GITHUB_CLIENT_ID=<github-client-id>
 KEYWARDEN_SOCIAL_GITHUB_CLIENT_SECRET=<github-secret>
-
-KEYWARDEN_SOCIAL_APPLE_ENABLED=true
-KEYWARDEN_SOCIAL_APPLE_CLIENT_ID=<apple-services-id>
-KEYWARDEN_SOCIAL_APPLE_CLIENT_SECRET=<apple-client-secret-jwt>
 ```
 
 Keywarden includes social auth URLs under:
@@ -147,10 +139,15 @@ Keywarden includes social auth URLs under:
 /accounts/sso/
 ```
 
-Provider callback URLs to register:
-- Google: `https://<your-keywarden-domain>/accounts/sso/google/login/callback/`
+Provider callback URL to register:
 - GitHub: `https://<your-keywarden-domain>/accounts/sso/github/login/callback/`
-- Apple: `https://<your-keywarden-domain>/accounts/sso/apple/login/callback/`
+
+Security behavior:
+- Social auto-onboarding is disabled.
+- Users must already exist in Keywarden and must link GitHub from `/accounts/profile/`.
+- After linking, `Login with GitHub` is available as an additional login method.
+- Local Keywarden email and GitHub email may differ; matching is by linked GitHub subject (`uid`).
+- Native password reset/email verification are disabled for SSO-linked accounts and handled in the IdP.
 
 ## 6. Email immutability behavior
 
@@ -180,6 +177,6 @@ When enabled, a previously promoted user is demoted to standard user if admin gr
 
 - Login page shows social buttons for enabled providers.
 - `/oidc/authenticate/` starts IdP login.
-- First login auto-creates local user.
+- First GitHub login only succeeds for previously linked users.
 - Repeat logins map to same local user via external identity subject.
 - Changing provider email for the same subject causes login rejection.

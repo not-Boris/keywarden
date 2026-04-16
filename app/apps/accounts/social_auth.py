@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError
 from django.shortcuts import redirect
+from django.urls import reverse
 
 from allauth.exceptions import ImmediateHttpResponse
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
-
-from apps.core.rbac import ROLE_USER, get_user_role, set_user_role
 
 from .identity import (
     build_unique_username,
@@ -23,8 +21,11 @@ from .models import ExternalIdentity
 
 class KeywardenSocialAccountAdapter(DefaultSocialAccountAdapter):
     def pre_social_login(self, request, sociallogin):
+        provider = str(sociallogin.account.provider or "").strip().lower()
+        if provider != "github":
+            self._reject(request, "Only GitHub social authentication is enabled.")
+
         email = self._extract_email(sociallogin)
-        provider = sociallogin.account.provider
         subject = str(sociallogin.account.uid or "").strip()
         if not subject:
             self._reject(request, "Login failed: provider did not return a stable user id.")
@@ -35,10 +36,13 @@ class KeywardenSocialAccountAdapter(DefaultSocialAccountAdapter):
             if not self._email_verified(sociallogin, email):
                 self._reject(request, "Login failed: provider email is not verified.")
 
-        if sociallogin.is_existing:
-            if normalize_email(sociallogin.user.email) != email:
-                raise PermissionDenied("Social login email does not match enrolled account email.")
-            self._sync_identity(sociallogin.user, sociallogin)
+        if self._is_connect_flow(request, sociallogin):
+            self._handle_connect_flow(
+                request,
+                sociallogin,
+                provider=provider,
+                subject=subject,
+            )
             return
 
         existing_link = (
@@ -50,24 +54,19 @@ class KeywardenSocialAccountAdapter(DefaultSocialAccountAdapter):
             )
             .first()
         )
-        if existing_link:
-            if normalize_email(existing_link.user.email) != email:
-                raise PermissionDenied("Linked social account email mismatch.")
-            sociallogin.connect(request, existing_link.user)
-            self._sync_identity(existing_link.user, sociallogin)
-            return
-
-        user = get_user_model().objects.filter(email__iexact=email).first()
-        if user:
-            sociallogin.connect(request, user)
-            self._sync_identity(user, sociallogin)
-            return
-
-        if not getattr(settings, "KEYWARDEN_SOCIAL_ALLOW_AUTO_ONBOARDING", False):
+        if not existing_link:
             self._reject(
                 request,
-                "Social auto-onboarding is disabled. Ask an administrator to create/link your account.",
+                "GitHub is not linked for this account. Sign in with your existing method and link GitHub from Profile.",
             )
+
+        if sociallogin.is_existing:
+            if getattr(sociallogin.user, "pk", None) != existing_link.user_id:
+                raise PermissionDenied("GitHub identity is already linked to another Keywarden account.")
+        else:
+            sociallogin.connect(request, existing_link.user)
+
+        self._sync_identity(existing_link.user, sociallogin)
 
     def populate_user(self, request, sociallogin, data):
         user = super().populate_user(request, sociallogin, data)
@@ -85,15 +84,7 @@ class KeywardenSocialAccountAdapter(DefaultSocialAccountAdapter):
         return user
 
     def save_user(self, request, sociallogin, form=None):
-        user = super().save_user(request, sociallogin, form=form)
-        email = self._extract_email(sociallogin)
-        if normalize_email(user.email) != email:
-            raise PermissionDenied("Social login email does not match enrolled account email.")
-        if get_user_role(user, default=None) is None:
-            set_user_role(user, ROLE_USER)
-            user.save(update_fields=["is_staff", "is_superuser"])
-        self._sync_identity(user, sociallogin)
-        return user
+        raise PermissionDenied("Social auto-onboarding is disabled. Link GitHub from your profile.")
 
     def _sync_identity(self, user, sociallogin) -> None:
         extra_data = dict(sociallogin.account.extra_data or {})
@@ -116,11 +107,67 @@ class KeywardenSocialAccountAdapter(DefaultSocialAccountAdapter):
         except IntegrityError as exc:
             raise PermissionDenied(str(exc)) from exc
 
+    def _handle_connect_flow(self, request, sociallogin, *, provider: str, subject: str) -> None:
+        if not request.user.is_authenticated:
+            self._reject(
+                request,
+                "Sign in with Keywarden first, then link GitHub from your profile.",
+            )
+
+        user = request.user
+
+        existing_subject_link = (
+            ExternalIdentity.objects.select_related("user")
+            .filter(
+                provider_type=ExternalIdentity.ProviderType.SOCIAL,
+                provider_id=provider,
+                subject=subject,
+            )
+            .first()
+        )
+        if existing_subject_link and existing_subject_link.user_id != user.id:
+            raise PermissionDenied("This GitHub account is already linked to another user.")
+
+        existing_provider_link = (
+            ExternalIdentity.objects.filter(
+                user=user,
+                provider_type=ExternalIdentity.ProviderType.SOCIAL,
+                provider_id=provider,
+            )
+            .exclude(subject=subject)
+            .first()
+        )
+        if existing_provider_link:
+            self._reject(
+                request,
+                "A different GitHub account is already linked. Unlink it before linking another account.",
+                redirect_to="accounts:profile",
+            )
+
+        if sociallogin.is_existing and getattr(sociallogin.user, "pk", None) != user.pk:
+            raise PermissionDenied("This GitHub account is already linked to another user.")
+
+        if not sociallogin.is_existing:
+            sociallogin.connect(request, user)
+        self._sync_identity(user, sociallogin)
+
+    def _is_connect_flow(self, request, sociallogin) -> bool:
+        process = str(
+            (getattr(sociallogin, "state", {}) or {}).get("process")
+            or request.GET.get("process")
+            or ""
+        ).strip().lower()
+        return process == "connect"
+
     def _extract_email(self, sociallogin) -> str:
-        user_email = normalize_email(getattr(sociallogin.user, "email", ""))
-        if user_email:
-            return user_email
-        return normalize_email((sociallogin.account.extra_data or {}).get("email"))
+        provider_email = normalize_email((sociallogin.account.extra_data or {}).get("email"))
+        if provider_email:
+            return provider_email
+        for address in getattr(sociallogin, "email_addresses", []):
+            candidate = normalize_email(getattr(address, "email", ""))
+            if candidate:
+                return candidate
+        return normalize_email(getattr(sociallogin.user, "email", ""))
 
     def _email_verified(self, sociallogin, email: str) -> bool:
         normalized = normalize_email(email)
@@ -137,6 +184,9 @@ class KeywardenSocialAccountAdapter(DefaultSocialAccountAdapter):
                 return True
         return False
 
-    def _reject(self, request, reason: str) -> None:
+    def _reject(self, request, reason: str, redirect_to: str = "accounts:login") -> None:
         messages.error(request, reason)
-        raise ImmediateHttpResponse(redirect("accounts:login"))
+        raise ImmediateHttpResponse(redirect(redirect_to))
+
+    def get_connect_redirect_url(self, request, socialaccount):
+        return reverse("accounts:profile")

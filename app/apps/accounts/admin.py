@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.utils import timezone
 from unfold.admin import ModelAdmin
 
-from .models import ErasureRequest, ExternalIdentity
+from .models import ErasureRequest, ExternalIdentity, NativeAccountSecurity
 
 
 class ErasureRequestAdminForm(forms.ModelForm):
@@ -88,4 +88,21 @@ class ExternalIdentityAdmin(ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None) -> bool:
+        return False
+
+
+@admin.register(NativeAccountSecurity)
+class NativeAccountSecurityAdmin(ModelAdmin):
+    list_display = (
+        "user",
+        "email_verified",
+        "email_verified_at",
+        "verification_email_sent_at",
+        "updated_at",
+    )
+    list_filter = ("email_verified",)
+    search_fields = ("user__username", "user__email")
+    readonly_fields = ("user", "email_verified_at", "verification_email_sent_at", "updated_at")
+
+    def has_add_permission(self, request) -> bool:
         return False

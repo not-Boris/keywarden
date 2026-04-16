@@ -82,6 +82,16 @@
           >
             Sign in
           </button>
+          {% if password_reset_enabled %}
+            <div class="text-center">
+              <a
+                href="{% url 'accounts:password_reset' %}"
+                class="text-sm font-medium text-blue-700 hover:underline"
+              >
+                Forgot your password?
+              </a>
+            </div>
+          {% endif %}
         </form>
 
         {% if oidc_enabled or social_providers %}

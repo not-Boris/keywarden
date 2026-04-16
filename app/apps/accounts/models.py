@@ -54,6 +54,25 @@ class ExternalIdentity(models.Model):
         )
 
 
+class NativeAccountSecurity(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="native_account_security",
+    )
+    email_verified = models.BooleanField(default=False, db_index=True)
+    email_verified_at = models.DateTimeField(null=True, blank=True)
+    verification_email_sent_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Native account security"
+        verbose_name_plural = "Native account security"
+
+    def __str__(self) -> str:
+        return f"native-security:{self.user_id}:{'verified' if self.email_verified else 'unverified'}"
+
+
 class ErasureRequest(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
