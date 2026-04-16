@@ -9,7 +9,25 @@ except ImportError:  # Fallback for older Unfold builds without guardian admin s
     class GuardedModelAdmin(GuardianGuardedModelAdmin, UnfoldModelAdmin):
         pass
 
-from .models import AgentCertificateAuthority, EnrollmentToken, Server
+from .models import AgentCertificateAuthority, EnrollmentToken, Server, ServerAuditLog, ServerLogSource
+
+
+class ServerLogSourceInline(admin.TabularInline):
+    model = ServerLogSource
+    extra = 0
+    fields = (
+        "enabled",
+        "kind",
+        "name",
+        "service_unit",
+        "file_path",
+        "parser",
+        "include_matches",
+        "exclude_matches",
+        "category_override",
+        "event_type_override",
+    )
+    ordering = ("kind", "name", "id")
 
 
 @admin.register(Server)
@@ -29,6 +47,7 @@ class ServerAdmin(GuardedModelAdmin):
         "created_at",
         "updated_at",
     )
+    inlines = (ServerLogSourceInline,)
 
     def avatar(self, obj: Server):
         if obj.image_url:
@@ -92,3 +111,64 @@ class AgentCertificateAuthorityAdmin(admin.ModelAdmin):
         for ca in queryset:
             ca.revoke()
             ca.save(update_fields=["is_active", "revoked_at"])
+
+
+@admin.register(ServerAuditLog)
+class ServerAuditLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "event_at",
+        "server",
+        "source_kind",
+        "source_name",
+        "category",
+        "event_type",
+        "username",
+        "source_ip",
+        "priority",
+    )
+    list_filter = ("source_kind", "category", "event_type", "priority", "server")
+    search_fields = ("message", "raw", "source_name", "username", "principal", "source_ip", "session_id")
+    readonly_fields = (
+        "server",
+        "event_at",
+        "received_at",
+        "source_kind",
+        "source_name",
+        "category",
+        "event_type",
+        "unit",
+        "priority",
+        "hostname",
+        "username",
+        "principal",
+        "source_ip",
+        "session_id",
+        "message",
+        "raw",
+        "fields",
+    )
+    ordering = ("-event_at", "-id")
+
+
+@admin.register(ServerLogSource)
+class ServerLogSourceAdmin(admin.ModelAdmin):
+    list_display = (
+        "server",
+        "enabled",
+        "kind",
+        "name",
+        "service_unit",
+        "file_path",
+        "parser",
+        "category_override",
+        "event_type_override",
+    )
+    list_filter = ("enabled", "kind", "server")
+    search_fields = (
+        "name",
+        "service_unit",
+        "file_path",
+        "parser",
+        "category_override",
+        "event_type_override",
+    )

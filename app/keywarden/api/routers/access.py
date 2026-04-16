@@ -128,6 +128,11 @@ def build_router() -> Router:
             server = Server.objects.get(id=payload.server_id)
         except Server.DoesNotExist:
             raise HttpError(404, "Server not found")
+        if not any([payload.request_shell, payload.request_logs, payload.request_users]):
+            raise HttpError(
+                422,
+                {"detail": "Select at least one access scope: shell, logs, or users."},
+            )
         access_request = AccessRequest(
             requester=request.user,
             server=server,

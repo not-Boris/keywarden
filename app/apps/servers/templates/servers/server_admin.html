@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% load tz %}
+
+{% block title %}Admin • {{ server.display_name }} • Keywarden{% endblock %}
+
+{% block content %}
+  <div class="space-y-6">
+    {% include "servers/_header.html" %}
+
+    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 pb-4">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">Server admin utilities</h2>
+          <p class="mt-1 text-sm text-gray-500">Server-scoped administration and maintenance actions.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="{{ admin_server_url }}" class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+            Edit server
+          </a>
+          <a href="{{ admin_log_sources_url }}" class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800">
+            Log sources
+          </a>
+        </div>
+      </div>
+      <dl class="mt-4 divide-y divide-gray-100 text-sm text-gray-700">
+        <div class="flex items-center justify-between py-2">
+          <dt class="text-gray-500">Agent enrolled</dt>
+          <dd class="font-medium text-gray-900">{% if server.agent_enrolled_at %}Yes{% else %}No{% endif %}</dd>
+        </div>
+        <div class="flex items-center justify-between py-2">
+          <dt class="text-gray-500">Enrollment timestamp</dt>
+          <dd class="font-medium text-gray-900">{{ server.agent_enrolled_at|utc|date:"M j, Y H:i:s"|default:"—" }}{% if server.agent_enrolled_at %} UTC{% endif %}</dd>
+        </div>
+        <div class="flex items-center justify-between py-2">
+          <dt class="text-gray-500">Last heartbeat</dt>
+          <dd class="font-medium text-gray-900">{{ server.last_heartbeat_at|utc|date:"M j, Y H:i:s"|default:"—" }}{% if server.last_heartbeat_at %} UTC{% endif %}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-4">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">Pending access requests</h2>
+          <p class="mt-1 text-sm text-gray-500">Approve or deny pending requests for this server.</p>
+        </div>
+        <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+          {{ pending_access_requests|length }} pending
+        </span>
+      </div>
+      {% if pending_access_requests %}
+        <div class="mt-4 overflow-x-auto rounded-xl border border-gray-200">
+          <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th class="px-3 py-2 font-semibold">Requester</th>
+                <th class="px-3 py-2 font-semibold">Requested scopes</th>
+                <th class="px-3 py-2 font-semibold">Requested at</th>
+                <th class="px-3 py-2 font-semibold text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 text-gray-700">
+              {% for req in pending_access_requests %}
+                <tr>
+                  <td class="px-3 py-2">{{ req.requester.username }}</td>
+                  <td class="px-3 py-2">
+                    <div class="flex flex-wrap gap-1">
+                      {% if req.request_shell %}<span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Shell</span>{% endif %}
+                      {% if req.request_logs %}<span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Logs</span>{% endif %}
+                      {% if req.request_users %}<span class="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Users</span>{% endif %}
+                    </div>
+                  </td>
+                  <td class="px-3 py-2">{{ req.requested_at|date:"M j, Y H:i" }}</td>
+                  <td class="px-3 py-2 text-right">
+                    <div class="inline-flex gap-2">
+                      <form method="post" action="{% url 'servers:decide_access_request' req.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="approve">
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Approve</button>
+                      </form>
+                      <form method="post" action="{% url 'servers:decide_access_request' req.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="deny">
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="inline-flex items-center rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">Deny</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="mt-4 text-sm text-gray-500">No pending requests for this server.</p>
+      {% endif %}
+    </section>
+
+    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="border-b border-gray-100 pb-4">
+        <h2 class="text-lg font-semibold text-gray-900">Users with access</h2>
+        <p class="mt-1 text-sm text-gray-500">Effective access from approved requests and object permissions.</p>
+      </div>
+      {% if users_with_access %}
+        <div class="mt-4 overflow-x-auto rounded-xl border border-gray-200">
+          <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th class="px-3 py-2 font-semibold">User</th>
+                <th class="px-3 py-2 font-semibold">Scopes</th>
+                <th class="px-3 py-2 font-semibold">Source</th>
+                <th class="px-3 py-2 font-semibold">Requests</th>
+                <th class="px-3 py-2 font-semibold">Expires</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 text-gray-700">
+              {% for entry in users_with_access %}
+                <tr>
+                  <td class="px-3 py-2">
+                    <div class="font-medium text-gray-900">{{ entry.user.username }}</div>
+                    <div class="text-xs text-gray-500">{{ entry.user.email|default:"—" }}</div>
+                  </td>
+                  <td class="px-3 py-2">
+                    <div class="flex flex-wrap gap-1">
+                      {% if entry.can_shell %}<span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Shell</span>{% endif %}
+                      {% if entry.can_logs %}<span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Logs</span>{% endif %}
+                      {% if entry.can_users %}<span class="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Users</span>{% endif %}
+                    </div>
+                  </td>
+                  <td class="px-3 py-2">
+                    {% for label in entry.source_labels %}
+                      <span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">{{ label }}</span>
+                    {% endfor %}
+                  </td>
+                  <td class="px-3 py-2">{{ entry.request_count }}</td>
+                  <td class="px-3 py-2">
+                    {% if entry.expires_at %}
+                      {{ entry.expires_at|date:"M j, Y H:i" }}
+                    {% else %}
+                      No expiry
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="mt-4 text-sm text-gray-500">No users currently have access on this server.</p>
+      {% endif %}
+    </section>
+
+    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="border-b border-gray-100 pb-4">
+        <h2 class="text-lg font-semibold text-gray-900">Server accounts</h2>
+        <p class="mt-1 text-sm text-gray-500">Accounts currently tracked by agent synchronization.</p>
+      </div>
+      {% if server_accounts %}
+        <div class="mt-4 overflow-x-auto rounded-xl border border-gray-200">
+          <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th class="px-3 py-2 font-semibold">System username</th>
+                <th class="px-3 py-2 font-semibold">User</th>
+                <th class="px-3 py-2 font-semibold">Present</th>
+                <th class="px-3 py-2 font-semibold">Last synced</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 text-gray-700">
+              {% for account in server_accounts %}
+                <tr>
+                  <td class="px-3 py-2 font-medium text-gray-900">{{ account.system_username }}</td>
+                  <td class="px-3 py-2">{{ account.user.username }}</td>
+                  <td class="px-3 py-2">
+                    {% if account.is_present %}
+                      <span class="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Present</span>
+                    {% else %}
+                      <span class="inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700">Missing</span>
+                    {% endif %}
+                  </td>
+                  <td class="px-3 py-2">{{ account.last_synced_at|utc|date:"M j, Y H:i:s" }} UTC</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="mt-4 text-sm text-gray-500">No synchronized server accounts yet.</p>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

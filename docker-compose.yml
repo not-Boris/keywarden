@@ -29,6 +29,7 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=keywarden.settings.dev
       - PYTHONPATH=/app
+      - TZ=UTC
     env_file:
       - .env
 

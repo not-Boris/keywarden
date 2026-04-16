@@ -1,0 +1,15 @@
+{
+  "server_url": "https://keywarden.dev.ntbx.io/api/v1",
+  "server_id": "6",
+  "agent_api_token": "HV8MnbysmINShu9wkXzzNrQE5NyRlPJHfP2aU6SX4HERrlac8EQpoMEu02FX1TYv",
+  "sync_interval_seconds": 5,
+  "log_batch_size": 2000,
+  "state_dir": "/var/lib/keywarden-agent",
+  "account_policy": {
+    "username_template": "{{username}}_{{user_id}}",
+    "default_shell": "/bin/bash",
+    "admin_group": "sudo",
+    "create_home": true,
+    "lock_on_revoke": true
+  }
+}

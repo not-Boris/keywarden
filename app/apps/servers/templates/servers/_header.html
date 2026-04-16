@@ -85,18 +85,22 @@
 </div>
 
 <nav class="mt-4 flex flex-wrap gap-2 border-b border-gray-200 pb-3 text-sm font-medium text-gray-500">
-  <a
-    href="{% url 'servers:detail' server.id %}"
-    class="{% if active_tab == 'details' %}rounded-full bg-blue-50 px-4 py-1.5 text-blue-700 ring-1 ring-blue-100{% else %}rounded-full bg-gray-100 px-4 py-1.5 text-gray-600 hover:bg-white hover:text-gray-900{% endif %}"
-  >
-    Details
-  </a>
-  <a
-    href="{% url 'servers:audit' server.id %}"
-    class="{% if active_tab == 'audit' %}rounded-full bg-blue-50 px-4 py-1.5 text-blue-700 ring-1 ring-blue-100{% else %}rounded-full bg-gray-100 px-4 py-1.5 text-gray-600 hover:bg-white hover:text-gray-900{% endif %}"
-  >
-    Audit
-  </a>
+  {% if can_users %}
+    <a
+      href="{% url 'servers:detail' server.id %}"
+      class="{% if active_tab == 'details' %}rounded-full bg-blue-50 px-4 py-1.5 text-blue-700 ring-1 ring-blue-100{% else %}rounded-full bg-gray-100 px-4 py-1.5 text-gray-600 hover:bg-white hover:text-gray-900{% endif %}"
+    >
+      Details
+    </a>
+  {% endif %}
+  {% if can_logs %}
+    <a
+      href="{% url 'servers:audit' server.id %}"
+      class="{% if active_tab == 'audit' %}rounded-full bg-blue-50 px-4 py-1.5 text-blue-700 ring-1 ring-blue-100{% else %}rounded-full bg-gray-100 px-4 py-1.5 text-gray-600 hover:bg-white hover:text-gray-900{% endif %}"
+    >
+      Audit
+    </a>
+  {% endif %}
   {% if can_shell %}
     <a
       href="{% url 'servers:shell' server.id %}"
@@ -105,10 +109,20 @@
       Shell
     </a>
   {% endif %}
-  <a
-    href="{% url 'servers:settings' server.id %}"
-    class="{% if active_tab == 'settings' %}rounded-full bg-blue-50 px-4 py-1.5 text-blue-700 ring-1 ring-blue-100{% else %}rounded-full bg-gray-100 px-4 py-1.5 text-gray-600 hover:bg-white hover:text-gray-900{% endif %}"
-  >
-    Settings
-  </a>
+  {% if can_users %}
+    <a
+      href="{% url 'servers:settings' server.id %}"
+      class="{% if active_tab == 'settings' %}rounded-full bg-blue-50 px-4 py-1.5 text-blue-700 ring-1 ring-blue-100{% else %}rounded-full bg-gray-100 px-4 py-1.5 text-gray-600 hover:bg-white hover:text-gray-900{% endif %}"
+    >
+      Settings
+    </a>
+  {% endif %}
+  {% if is_server_admin %}
+    <a
+      href="{% url 'servers:server_admin' server.id %}"
+      class="{% if active_tab == 'admin' %}rounded-full bg-blue-50 px-4 py-1.5 text-blue-700 ring-1 ring-blue-100{% else %}rounded-full bg-gray-100 px-4 py-1.5 text-gray-600 hover:bg-white hover:text-gray-900{% endif %}"
+    >
+      Admin
+    </a>
+  {% endif %}
 </nav>

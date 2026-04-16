@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import secrets
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -34,8 +35,9 @@ class ShellConsumer(AsyncWebsocketConsumer):
         self.tempdir = None
         self.tempdir_path = ""
         self.ssh_started = False
-        self.key_cleanup_task = None
-        self.key_paths = []
+        self.ssh_output_seen = False
+        self.key_path = ""
+        self.cert_path = ""
         self.system_username = ""
         self.shell_target = ""
         self.server_id: int | None = None
@@ -91,9 +93,6 @@ class ShellConsumer(AsyncWebsocketConsumer):
         if self.reader_task:
             self.reader_task.cancel()
             self.reader_task = None
-        if self.key_cleanup_task:
-            self.key_cleanup_task.cancel()
-            self.key_cleanup_task = None
         if self.proc and self.proc.returncode is None:
             self.proc.terminate()
             try:
@@ -101,8 +100,9 @@ class ShellConsumer(AsyncWebsocketConsumer):
             except asyncio.TimeoutError:
                 self.proc.kill()
         if self.tempdir_path and self.ssh_started:
-            shutil.rmtree(self.tempdir_path, ignore_errors=True)
-            self.tempdir_path = ""
+            if not _is_truthy(getattr(settings, "KEYWARDEN_SHELL_PRESERVE_TMP", False)):
+                shutil.rmtree(self.tempdir_path, ignore_errors=True)
+                self.tempdir_path = ""
         self.tempdir = None
 
     async def receive(self, text_data=None, bytes_data=None):
@@ -131,38 +131,16 @@ class ShellConsumer(AsyncWebsocketConsumer):
             user,
             self.system_username,
         )
+        self.key_path = key_path
+        self.cert_path = cert_path
         ssh_host = _format_ssh_host(self.shell_target)
-        # Use a locked-down, non-interactive SSH invocation suitable for websockets.
-        command = [
-            "ssh",
-            "-tt",
-            "-i",
-            key_path,
-            "-o",
-            f"CertificateFile={cert_path}",
-            "-o",
-            "BatchMode=yes",
-            "-o",
-            "PasswordAuthentication=no",
-            "-o",
-            "KbdInteractiveAuthentication=no",
-            "-o",
-            "ChallengeResponseAuthentication=no",
-            "-o",
-            "PreferredAuthentications=publickey",
-            "-o",
-            "UserKnownHostsFile=/dev/null",
-            "-o",
-            "GlobalKnownHostsFile=/dev/null",
-            "-o",
-            "StrictHostKeyChecking=no",
-            "-o",
-            "VerifyHostKeyDNS=no",
-            "-o",
-            "LogLevel=ERROR",
-            f"{self.system_username}@{ssh_host}",
-            "/bin/bash",
-        ]
+        # Build a locked-down SSH invocation and explicitly launch a remote shell.
+        command = _build_ssh_command(
+            key_path=key_path,
+            cert_path=cert_path,
+            username=self.system_username,
+            host=ssh_host,
+        )
         self.proc = await asyncio.create_subprocess_exec(
             *command,
             stdin=asyncio.subprocess.PIPE,
@@ -170,8 +148,6 @@ class ShellConsumer(AsyncWebsocketConsumer):
             stderr=asyncio.subprocess.STDOUT,
         )
         self.ssh_started = True
-        self.key_paths = [key_path, cert_path, f"{key_path}.pub"]
-        self.key_cleanup_task = asyncio.create_task(self._cleanup_keys_after_delay(5))
         self.reader_task = asyncio.create_task(self._stream_output())
 
     async def _stream_output(self):
@@ -182,21 +158,104 @@ class ShellConsumer(AsyncWebsocketConsumer):
             chunk = await self.proc.stdout.read(4096)
             if not chunk:
                 break
+            self.ssh_output_seen = True
             await self.send(bytes_data=chunk)
+        if self.proc:
+            exit_code = await self.proc.wait()
+            if exit_code != 0 and not self.ssh_output_seen:
+                if _is_truthy(getattr(settings, "KEYWARDEN_SHELL_DEBUG", False)):
+                    await self._send_ssh_failure_diagnostics(exit_code)
+                else:
+                    await self.send(
+                        text_data=(
+                            f"\r\nSSH exited with status {exit_code}. "
+                            "Verify host reachability, username, and SSH CA trust.\r\n"
+                        )
+                    )
         await self.close()
 
-    async def _cleanup_keys_after_delay(self, delay_seconds: int):
+    async def _send_ssh_failure_diagnostics(self, exit_code: int) -> None:
+        lines = [
+            (
+                f"\r\nSSH exited with status {exit_code}. "
+                "Verify host reachability, username, and SSH CA trust.\r\n"
+            ),
+            f"Target: {self.system_username}@{self.shell_target}\r\n",
+        ]
+        if self.tempdir_path and _is_truthy(getattr(settings, "KEYWARDEN_SHELL_PRESERVE_TMP", False)):
+            lines.append(f"Session key material preserved at: {self.tempdir_path}\r\n")
+        cert_info = await self._inspect_session_certificate()
+        if cert_info:
+            lines.append("\r\nSession certificate details:\r\n")
+            lines.append(cert_info)
+            lines.append("\r\n")
+        diagnostic = await self._run_ssh_probe()
+        if diagnostic:
+            lines.append("\r\nSSH probe output:\r\n")
+            lines.append(diagnostic)
+            lines.append("\r\n")
+        await self.send(text_data="".join(lines))
+
+    async def _inspect_session_certificate(self) -> str:
+        if not self.cert_path:
+            return ""
         try:
-            await asyncio.sleep(delay_seconds)
-            for path in self.key_paths:
-                try:
-                    os.remove(path)
-                except FileNotFoundError:
-                    continue
-                except Exception:
-                    pass
-        finally:
-            self.key_paths = []
+            proc = await asyncio.create_subprocess_exec(
+                "ssh-keygen",
+                "-L",
+                "-f",
+                self.cert_path,
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+        except Exception:
+            return ""
+        output, _ = await proc.communicate()
+        if not output:
+            return ""
+        text = output.decode("utf-8", "ignore").strip()
+        if not text:
+            return ""
+        return _truncate_lines(text, max_lines=20, max_chars=2000)
+
+    async def _run_ssh_probe(self) -> str:
+        if not self.key_path or not self.cert_path or not self.system_username or not self.shell_target:
+            return ""
+        probe_command = _build_ssh_command(
+            key_path=self.key_path,
+            cert_path=self.cert_path,
+            username=self.system_username,
+            host=_format_ssh_host(self.shell_target),
+            remote_command="true",
+            force_tty=False,
+            log_level="DEBUG1",
+            connect_timeout=8,
+        )
+        probe_command.insert(1, "-v")
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *probe_command,
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+        except Exception:
+            return ""
+        timeout = int(getattr(settings, "KEYWARDEN_SHELL_DIAG_TIMEOUT_SECONDS", 10))
+        timeout = max(1, timeout)
+        try:
+            output, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            return f"(probe timed out after {timeout}s)"
+        if not output:
+            return f"(probe exited with status {proc.returncode} and no output)"
+        text = output.decode("utf-8", "ignore").strip()
+        if not text:
+            return f"(probe exited with status {proc.returncode} and no output)"
+        return _summarize_probe_output(text)
 
     @database_sync_to_async
     def _get_server(self, user, server_id: int):
@@ -310,3 +369,142 @@ def _format_ssh_host(host: str) -> str:
     if ":" in host and not (host.startswith("[") and host.endswith("]")):
         return f"[{host}]"
     return host
+
+
+def _build_ssh_command(
+    *,
+    key_path: str,
+    cert_path: str,
+    username: str,
+    host: str,
+    remote_command: str | None = None,
+    force_tty: bool = True,
+    log_level: str = "ERROR",
+    connect_timeout: int | None = None,
+) -> list[str]:
+    command = [
+        "ssh",
+    ]
+    if force_tty:
+        command.append("-tt")
+    command.extend(
+        [
+            "-i",
+            key_path,
+            "-o",
+            f"CertificateFile={cert_path}",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "PasswordAuthentication=no",
+            "-o",
+            "KbdInteractiveAuthentication=no",
+            "-o",
+            "ChallengeResponseAuthentication=no",
+            "-o",
+            "PreferredAuthentications=publickey",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            "-o",
+            "GlobalKnownHostsFile=/dev/null",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "VerifyHostKeyDNS=no",
+            "-o",
+            f"LogLevel={log_level}",
+        ]
+    )
+    if connect_timeout is not None:
+        command.extend(["-o", f"ConnectTimeout={connect_timeout}"])
+    command.append(f"{username}@{host}")
+    if remote_command is None:
+        remote_command = str(getattr(settings, "KEYWARDEN_SHELL_REMOTE_COMMAND", "/bin/bash")).strip()
+    else:
+        remote_command = str(remote_command).strip()
+    if not remote_command:
+        return command
+    try:
+        remote_argv = shlex.split(remote_command)
+    except ValueError:
+        remote_argv = [remote_command]
+    if remote_argv:
+        command.extend(remote_argv)
+    return command
+
+
+def _is_truthy(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _truncate_lines(text: str, *, max_lines: int, max_chars: int) -> str:
+    if not text:
+        return ""
+    clipped = text[:max_chars]
+    lines = clipped.splitlines()
+    if len(lines) > max_lines:
+        head_count = max(1, max_lines // 2)
+        tail_count = max(1, max_lines - head_count)
+        lines = (
+            lines[:head_count]
+            + ["... (middle omitted) ..."]
+            + lines[-tail_count:]
+        )
+    if len(text) > max_chars:
+        lines.append("... (truncated by size)")
+    return "\n".join(lines)
+
+
+def _summarize_probe_output(text: str) -> str:
+    if not text:
+        return ""
+    lines = text.splitlines()
+    lower_text = text.lower()
+    causes = []
+    if "account has expired" in lower_text:
+        causes.append("Remote Linux account is expired.")
+    if "permission denied (publickey" in lower_text or "permission denied" in lower_text:
+        causes.append("SSH authentication was denied by server policy.")
+    if "no such user" in lower_text:
+        causes.append("Remote user account does not exist.")
+    if "certificate invalid" in lower_text or "invalid certificate" in lower_text:
+        causes.append("SSH certificate was rejected by the server.")
+    keywords = (
+        "authenticating to",
+        "offering public key",
+        "offering publickey",
+        "server accepts key",
+        "sign_and_send_pubkey",
+        "authentications that can continue",
+        "permission denied",
+        "authentication succeeded",
+        "received disconnect",
+        "userauth",
+        "certificate",
+        "principal",
+        "no such user",
+        "account is locked",
+    )
+    interesting = []
+    for line in lines:
+        lower = line.lower()
+        if any(keyword in lower for keyword in keywords):
+            interesting.append(line)
+    out = []
+    if causes:
+        out.append("Detected cause:")
+        for cause in causes:
+            out.append(f"- {cause}")
+        out.append("")
+    if interesting:
+        out.append("Auth highlights:")
+        out.extend(interesting[-30:])
+    if lines:
+        out.append("")
+        out.append("Probe tail:")
+        out.extend(lines[-20:])
+    return _truncate_lines("\n".join(out), max_lines=80, max_chars=8000)

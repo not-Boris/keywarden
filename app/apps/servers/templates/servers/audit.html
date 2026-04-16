@@ -1,46 +1,602 @@
 {% extends "base.html" %}
+{% load static tz %}
 
 {% block title %}Audit • {{ server.display_name }} • Keywarden{% endblock %}
+
+{% block extra_head %}
+  <style>
+    .ak-chart-card {
+      border-color: #1f2937;
+      background: radial-gradient(120% 140% at 0% 0%, #1e293b 0%, #111827 50%, #0b1220 100%);
+      color: #e5e7eb;
+      box-shadow: 0 10px 30px rgba(2, 6, 23, 0.35);
+    }
+
+    .ak-chart-title {
+      color: #f3f4f6;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .ak-chart-subtitle {
+      color: #94a3b8;
+    }
+
+    .ak-chart-badge {
+      border: 1px solid rgba(100, 116, 139, 0.45);
+      background: rgba(15, 23, 42, 0.65);
+      color: #e2e8f0;
+    }
+
+    .ak-chart-canvas-wrap {
+      border: 1px solid rgba(71, 85, 105, 0.35);
+      background: rgba(2, 6, 23, 0.32);
+      border-radius: 14px;
+      padding: 0.6rem 0.75rem;
+    }
+
+    .ak-chart-empty {
+      color: #94a3b8;
+    }
+  </style>
+{% endblock %}
 
 {% block content %}
   <div class="space-y-6">
     {% include "servers/_header.html" %}
 
-    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 class="text-lg font-semibold text-gray-900">Audit logs</h2>
-          <p class="mt-1 text-sm text-gray-500">Track certificate issuance and access events.</p>
-        </div>
-        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">Placeholder</span>
-      </div>
-      <div class="mt-5 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
-        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-700">
-          <svg class="h-6 w-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6l4 2" />
-            <circle cx="12" cy="12" r="9" stroke-width="1.5"></circle>
-          </svg>
-        </div>
-        <p class="mt-3 text-sm text-gray-600">Logs will appear here once collection is enabled for this server.</p>
+    <section class="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+      <div class="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-500">
+        <button
+          type="button"
+          class="js-audit-subpage rounded-full px-4 py-1.5 text-xs font-semibold {% if audit_subpage == 'charts' %}bg-blue-50 text-blue-700 ring-1 ring-blue-100{% else %}bg-gray-100 text-gray-600 hover:bg-white hover:text-gray-900{% endif %}"
+          data-audit-subpage="charts"
+        >
+          Charts
+        </button>
+        <button
+          type="button"
+          class="js-audit-subpage rounded-full px-4 py-1.5 text-xs font-semibold {% if audit_subpage == 'logs' %}bg-blue-50 text-blue-700 ring-1 ring-blue-100{% else %}bg-gray-100 text-gray-600 hover:bg-white hover:text-gray-900{% endif %}"
+          data-audit-subpage="logs"
+        >
+          Logs
+        </button>
       </div>
     </section>
 
     <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 class="text-lg font-semibold text-gray-900">Metrics</h2>
-          <p class="mt-1 text-sm text-gray-500">Monitor CPU, memory, and session activity.</p>
+          <h2 class="text-lg font-semibold text-gray-900">Audit workspace</h2>
+          <p class="mt-1 text-sm text-gray-500">Open multiple filtered panels side by side for service/file comparisons.</p>
         </div>
-        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">Placeholder</span>
+        <div class="flex flex-wrap items-center gap-2 text-xs font-semibold">
+          <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">Total: {{ audit_summary.total_count }}</span>
+          <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">24h: {{ audit_summary.recent_24h_count }}</span>
+          <div id="js-audit-log-controls" class="flex flex-wrap items-center gap-2 {% if audit_subpage != 'logs' %}hidden{% endif %}">
+            <label for="js-audit-line-limit" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-gray-700">
+              <span>Lines</span>
+              <select id="js-audit-line-limit" class="rounded border border-gray-200 bg-white px-2 py-0.5 text-xs font-semibold text-gray-700">
+                {% for option in audit_line_limit_options %}
+                  <option value="{{ option }}" {% if option == audit_line_limit %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <button type="button" id="js-add-audit-panel" class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800">
+              New panel
+            </button>
+          </div>
+        </div>
       </div>
-      <div class="mt-5 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
-        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-700">
-          <svg class="h-6 w-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12h18M7 8v8M17 8v8" />
-          </svg>
+      <dl class="mt-4 grid gap-4 text-xs text-gray-600 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <dt class="font-semibold uppercase tracking-wide text-gray-500">Last event</dt>
+          <dd class="mt-1 text-sm font-semibold text-gray-900">{{ audit_summary.last_event_at|utc|date:"M j, Y H:i:s"|default:"—" }}{% if audit_summary.last_event_at %} UTC{% endif %}</dd>
         </div>
-        <p class="mt-3 text-sm text-gray-600">Metrics will appear here once collection is enabled for this server.</p>
+        <div>
+          <dt class="font-semibold uppercase tracking-wide text-gray-500">Last ingest</dt>
+          <dd class="mt-1 text-sm font-semibold text-gray-900">{{ audit_summary.last_ingest_at|utc|date:"M j, Y H:i:s"|default:"—" }}{% if audit_summary.last_ingest_at %} UTC{% endif %}</dd>
+        </div>
+        <div class="sm:col-span-2">
+          <dt class="font-semibold uppercase tracking-wide text-gray-500">Top categories</dt>
+          <dd class="mt-1">
+            {% if audit_summary.top_categories %}
+              {% for item in audit_summary.top_categories %}
+                <span class="mr-2 inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{{ item.category }}: {{ item.total }}</span>
+              {% endfor %}
+            {% else %}
+              —
+            {% endif %}
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <section id="js-audit-subpage-charts" class="space-y-4 {% if audit_subpage != 'charts' %}hidden{% endif %}">
+      {% with login=audit_charts.login_attempts %}
+        <article class="ak-chart-card rounded-2xl border p-5 shadow-sm">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 class="ak-chart-title text-sm">Login Attempts vs Failures</h3>
+              <p class="ak-chart-subtitle mt-1 text-xs">Click a bar to open logs with matching filters.</p>
+            </div>
+            <span class="ak-chart-badge inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold">
+              Failure rate: {{ login.failure_rate_pct }}%
+            </span>
+          </div>
+          <div class="ak-chart-canvas-wrap mt-4 h-64">
+            <canvas id="js-login-chart"></canvas>
+          </div>
+          <p id="js-login-chart-empty" class="ak-chart-empty mt-2 text-xs {% if login.chart.labels %}hidden{% endif %}">No login events detected yet.</p>
+        </article>
+      {% endwith %}
+
+      <div class="grid gap-4 lg:grid-cols-2">
+        {% with http_codes=audit_charts.http_status_codes %}
+          <article class="ak-chart-card rounded-2xl border p-5 shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 class="ak-chart-title text-sm">HTTP Status Codes (Nginx)</h3>
+                <p class="ak-chart-subtitle mt-1 text-xs">Excludes implicit `1xx` and `200`; click a bar to filter logs.</p>
+              </div>
+              <span class="ak-chart-badge inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold">
+                Visible HTTP events: {{ http_codes.total }}
+              </span>
+            </div>
+            <div class="ak-chart-canvas-wrap mt-4 h-64">
+              <canvas id="js-http-status-chart"></canvas>
+            </div>
+            {% if http_codes.chart.labels %}
+              <p id="js-http-status-chart-empty" class="ak-chart-empty mt-2 hidden text-xs"></p>
+            {% elif http_codes.implicit_total %}
+              <p id="js-http-status-chart-empty" class="ak-chart-empty mt-2 text-xs">Only implicit `1xx`/`200` responses were observed ({{ http_codes.implicit_total }} entries), so this chart is intentionally empty.</p>
+            {% else %}
+              <p id="js-http-status-chart-empty" class="ak-chart-empty mt-2 text-xs">No HTTP access events with status codes yet.</p>
+            {% endif %}
+          </article>
+        {% endwith %}
+
+        {% with event_types=audit_charts.security_event_types %}
+          <article class="ak-chart-card rounded-2xl border p-5 shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 class="ak-chart-title text-sm">Security Event Types</h3>
+                <p class="ak-chart-subtitle mt-1 text-xs">Click a bar to open logs filtered to that event type.</p>
+              </div>
+              <span class="ak-chart-badge inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold">
+                Events: {{ event_types.total }}
+              </span>
+            </div>
+            <div class="ak-chart-canvas-wrap mt-4 h-64">
+              <canvas id="js-security-events-chart"></canvas>
+            </div>
+            <p id="js-security-events-chart-empty" class="ak-chart-empty mt-2 text-xs {% if event_types.chart.labels %}hidden{% endif %}">No security event-type distribution available yet.</p>
+          </article>
+        {% endwith %}
+      </div>
+
+      {% with failed_ips=audit_charts.failed_source_ips %}
+        <article class="ak-chart-card rounded-2xl border p-5 shadow-sm">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 class="ak-chart-title text-sm">Failed Login Source IPs</h3>
+              <p class="ak-chart-subtitle mt-1 text-xs">Click a bar to inspect failed logins from that source IP.</p>
+            </div>
+            <span class="ak-chart-badge inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold">
+              Failed events: {{ failed_ips.total }}
+            </span>
+          </div>
+          <div class="ak-chart-canvas-wrap mt-4 h-64">
+            <canvas id="js-failed-ips-chart"></canvas>
+          </div>
+          <p id="js-failed-ips-chart-empty" class="ak-chart-empty mt-2 text-xs {% if failed_ips.chart.labels %}hidden{% endif %}">No failed-login IP activity detected.</p>
+        </article>
+      {% endwith %}
+    </section>
+
+    <section id="js-audit-subpage-logs" class="{% if audit_subpage != 'logs' %}hidden{% endif %}">
+      <div id="js-audit-panel-grid" class="grid gap-4">
+        <article class="rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div class="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+            <h3 class="text-sm font-semibold text-gray-900">Panel 1</h3>
+            <div class="flex items-center gap-2">
+              <button type="button" class="js-duplicate-panel rounded border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">Duplicate</button>
+              <button type="button" class="js-close-panel rounded border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50" disabled>Close</button>
+            </div>
+          </div>
+          <div class="js-panel-content p-4">
+            {% include "servers/_audit_panel.html" with panel=initial_panel server=server %}
+          </div>
+        </article>
       </div>
     </section>
   </div>
+
+  {{ audit_charts.login_attempts.chart|json_script:"js-login-chart-data" }}
+  {{ audit_charts.http_status_codes.chart|json_script:"js-http-status-chart-data" }}
+  {{ audit_charts.security_event_types.chart|json_script:"js-security-events-chart-data" }}
+  {{ audit_charts.failed_source_ips.chart|json_script:"js-failed-ips-chart-data" }}
+
+  <script src="{% static 'unfold/js/chart/chart.js' %}"></script>
+  <script>
+    (function () {
+      var subpageButtons = document.querySelectorAll(".js-audit-subpage");
+      var chartsSection = document.getElementById("js-audit-subpage-charts");
+      var logsSection = document.getElementById("js-audit-subpage-logs");
+      var logControls = document.getElementById("js-audit-log-controls");
+      var panelCounter = 1;
+      var grid = document.getElementById("js-audit-panel-grid");
+      var addButton = document.getElementById("js-add-audit-panel");
+      var panelUrl = "{{ audit_panel_url }}";
+      var lineLimitSelect = document.getElementById("js-audit-line-limit");
+      var chartsInitialized = false;
+      var auditPath = "{{ request.path }}";
+
+      function parseChartData(scriptId) {
+        var script = document.getElementById(scriptId);
+        if (!script) {
+          return null;
+        }
+        try {
+          return JSON.parse(script.textContent);
+        } catch (err) {
+          return null;
+        }
+      }
+
+      function renderBarChart(canvasId, emptyId, data, options) {
+        var canvas = document.getElementById(canvasId);
+        var emptyNode = document.getElementById(emptyId);
+        var chartOpts = options || {};
+        if (!canvas) {
+          return;
+        }
+        if (!window.Chart || !data || !Array.isArray(data.labels) || data.labels.length === 0) {
+          canvas.classList.add("hidden");
+          if (emptyNode) {
+            emptyNode.classList.remove("hidden");
+          }
+          return;
+        }
+        if (emptyNode) {
+          emptyNode.classList.add("hidden");
+        }
+        canvas.classList.remove("hidden");
+        var chartData = {
+          labels: data.labels,
+          datasets: [
+            {
+              label: chartOpts.datasetLabel || "Events",
+              data: data.values,
+              backgroundColor: data.colors,
+              borderRadius: 4,
+              borderSkipped: false,
+              maxBarThickness: chartOpts.maxBarThickness || 36
+            }
+          ]
+        };
+        new window.Chart(canvas.getContext("2d"), {
+          type: "bar",
+          data: chartData,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: chartOpts.indexAxis || "x",
+            plugins: {
+              legend: {
+                display: true,
+                position: "top",
+                align: "center",
+                labels: {
+                  color: "#e2e8f0",
+                  boxWidth: 18,
+                  boxHeight: 8,
+                  font: {
+                    size: 12,
+                    weight: "600"
+                  }
+                }
+              },
+              tooltip: {
+                backgroundColor: "rgba(15, 23, 42, 0.94)",
+                borderColor: "rgba(148, 163, 184, 0.35)",
+                borderWidth: 1,
+                titleColor: "#e2e8f0",
+                bodyColor: "#cbd5e1",
+                callbacks: {
+                  label: function (ctx) {
+                    var isHorizontal = chartOpts.indexAxis === "y";
+                    var value = isHorizontal ? ctx.parsed.x : ctx.parsed.y;
+                    return "Count: " + value;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                beginAtZero: true,
+                ticks: {
+                  precision: 0,
+                  color: "#94a3b8"
+                },
+                grid: {
+                  color: "rgba(148, 163, 184, 0.12)",
+                  drawBorder: false
+                }
+              },
+              y: {
+                ticks: {
+                  color: "#cbd5e1"
+                },
+                grid: {
+                  color: "rgba(148, 163, 184, 0.08)",
+                  drawBorder: false
+                }
+              }
+            },
+            onClick: function (_, activeElements) {
+              if (!activeElements || !activeElements.length) {
+                return;
+              }
+              var index = activeElements[0].index;
+              var query = (data.drilldowns || [])[index] || "";
+              if (!query) {
+                return;
+              }
+              window.location.href = auditPath + "?" + query;
+            },
+            onHover: function (event, activeElements) {
+              var target = event && event.native ? event.native.target : null;
+              if (!target || !target.style) {
+                return;
+              }
+              target.style.cursor = activeElements && activeElements.length ? "pointer" : "default";
+            }
+          }
+        });
+      }
+
+      function initializeCharts() {
+        if (chartsInitialized) {
+          return;
+        }
+        chartsInitialized = true;
+        renderBarChart("js-login-chart", "js-login-chart-empty", parseChartData("js-login-chart-data"), {
+          datasetLabel: "Logins"
+        });
+        renderBarChart("js-http-status-chart", "js-http-status-chart-empty", parseChartData("js-http-status-chart-data"), {
+          datasetLabel: "HTTP status"
+        });
+        renderBarChart("js-security-events-chart", "js-security-events-chart-empty", parseChartData("js-security-events-chart-data"), {
+          datasetLabel: "Events"
+        });
+        renderBarChart("js-failed-ips-chart", "js-failed-ips-chart-empty", parseChartData("js-failed-ips-chart-data"), {
+          datasetLabel: "Failed logins",
+          indexAxis: "y",
+          maxBarThickness: 24
+        });
+      }
+
+      function setSubpageButtonState(button, isActive) {
+        if (isActive) {
+          button.classList.remove("bg-gray-100", "text-gray-600", "hover:bg-white", "hover:text-gray-900");
+          button.classList.add("bg-blue-50", "text-blue-700", "ring-1", "ring-blue-100");
+          return;
+        }
+        button.classList.remove("bg-blue-50", "text-blue-700", "ring-1", "ring-blue-100");
+        button.classList.add("bg-gray-100", "text-gray-600", "hover:bg-white", "hover:text-gray-900");
+      }
+
+      function setSubpage(view, updateUrl) {
+        var target = view === "charts" ? "charts" : "logs";
+        if (chartsSection) {
+          chartsSection.classList.toggle("hidden", target !== "charts");
+        }
+        if (logsSection) {
+          logsSection.classList.toggle("hidden", target !== "logs");
+        }
+        if (logControls) {
+          logControls.classList.toggle("hidden", target !== "logs");
+        }
+        if (target === "charts") {
+          initializeCharts();
+        }
+        for (var i = 0; i < subpageButtons.length; i += 1) {
+          var button = subpageButtons[i];
+          setSubpageButtonState(button, button.getAttribute("data-audit-subpage") === target);
+        }
+        if (!updateUrl || !window.history || !window.history.replaceState) {
+          return;
+        }
+        var url = new URL(window.location.href);
+        url.searchParams.set("view", target);
+        window.history.replaceState({}, "", url.toString());
+      }
+
+      function getSelectedLineLimit() {
+        if (!lineLimitSelect) {
+          return "{{ audit_line_limit }}";
+        }
+        return lineLimitSelect.value || "{{ audit_line_limit }}";
+      }
+
+      function withLineLimit(queryString) {
+        var params = new URLSearchParams(queryString || "");
+        params.set("line_limit", getSelectedLineLimit());
+        return params.toString();
+      }
+
+      function updateGridLayout() {
+        if (!grid) {
+          return;
+        }
+        var panels = grid.querySelectorAll("article").length;
+        if (panels > 1) {
+          grid.classList.add("lg:grid-cols-2");
+        } else {
+          grid.classList.remove("lg:grid-cols-2");
+        }
+      }
+
+      function setCloseButtons() {
+        if (!grid) {
+          return;
+        }
+        var panels = grid.querySelectorAll("article");
+        for (var i = 0; i < panels.length; i += 1) {
+          var closeBtn = panels[i].querySelector(".js-close-panel");
+          if (!closeBtn) {
+            continue;
+          }
+          closeBtn.disabled = panels.length <= 1;
+        }
+      }
+
+      function loadPanelContent(contentNode, queryString) {
+        if (!contentNode) {
+          return;
+        }
+        var url = panelUrl;
+        var normalizedQuery = withLineLimit(queryString);
+        if (normalizedQuery) {
+          url += (url.indexOf("?") === -1 ? "?" : "&") + normalizedQuery;
+        }
+        fetch(url, {
+          credentials: "same-origin",
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error("Failed to load panel");
+            }
+            return response.text();
+          })
+          .then(function (html) {
+            contentNode.innerHTML = html;
+          })
+          .catch(function () {
+            contentNode.innerHTML = "<p class=\"text-sm text-rose-700\">Could not load panel data.</p>";
+          });
+      }
+
+      function createPanel(queryString) {
+        if (!grid) {
+          return;
+        }
+        panelCounter += 1;
+        var article = document.createElement("article");
+        article.className = "rounded-2xl border border-gray-200 bg-white shadow-sm";
+        article.innerHTML =
+          "<div class=\"flex items-center justify-between border-b border-gray-100 px-4 py-3\">" +
+            "<h3 class=\"text-sm font-semibold text-gray-900\">Panel " + panelCounter + "</h3>" +
+            "<div class=\"flex items-center gap-2\">" +
+              "<button type=\"button\" class=\"js-duplicate-panel rounded border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50\">Duplicate</button>" +
+              "<button type=\"button\" class=\"js-close-panel rounded border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50\">Close</button>" +
+            "</div>" +
+          "</div>" +
+          "<div class=\"js-panel-content p-4\"><p class=\"text-sm text-gray-500\">Loading…</p></div>";
+        grid.appendChild(article);
+        setCloseButtons();
+        updateGridLayout();
+        loadPanelContent(article.querySelector(".js-panel-content"), queryString || "");
+      }
+
+      for (var subpageIndex = 0; subpageIndex < subpageButtons.length; subpageIndex += 1) {
+        subpageButtons[subpageIndex].addEventListener("click", function (event) {
+          var target = event.currentTarget;
+          if (!(target instanceof HTMLElement)) {
+            return;
+          }
+          setSubpage(target.getAttribute("data-audit-subpage") || "logs", true);
+        });
+      }
+      setSubpage("{{ audit_subpage }}", false);
+
+      if (addButton) {
+        addButton.addEventListener("click", function () {
+          createPanel("");
+        });
+      }
+
+      if (lineLimitSelect && grid) {
+        lineLimitSelect.addEventListener("change", function () {
+          var panels = grid.querySelectorAll("article");
+          for (var i = 0; i < panels.length; i += 1) {
+            var panel = panels[i];
+            var form = panel.querySelector(".js-audit-panel-form");
+            var queryString = "";
+            if (form) {
+              queryString = new URLSearchParams(new FormData(form)).toString();
+            }
+            loadPanelContent(panel.querySelector(".js-panel-content"), queryString);
+          }
+        });
+      }
+
+      if (!grid) {
+        return;
+      }
+
+      grid.addEventListener("click", function (event) {
+        var target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        if (target.classList.contains("js-close-panel")) {
+          var panel = target.closest("article");
+          if (!panel) {
+            return;
+          }
+          panel.remove();
+          setCloseButtons();
+          updateGridLayout();
+          return;
+        }
+        if (target.classList.contains("js-duplicate-panel")) {
+          var currentPanel = target.closest("article");
+          if (!currentPanel) {
+            return;
+          }
+          var form = currentPanel.querySelector(".js-audit-panel-form");
+          var queryString = "";
+          if (form) {
+            queryString = new URLSearchParams(new FormData(form)).toString();
+          }
+          createPanel(queryString);
+          return;
+        }
+        if (target.classList.contains("js-panel-link")) {
+          event.preventDefault();
+          var href = target.getAttribute("href") || "";
+          var idx = href.indexOf("?");
+          var query = idx >= 0 ? href.substring(idx + 1) : "";
+          var panelForLink = target.closest("article");
+          if (!panelForLink) {
+            return;
+          }
+          loadPanelContent(panelForLink.querySelector(".js-panel-content"), query);
+        }
+      });
+
+      grid.addEventListener("submit", function (event) {
+        var form = event.target;
+        if (!(form instanceof HTMLFormElement)) {
+          return;
+        }
+        if (!form.classList.contains("js-audit-panel-form")) {
+          return;
+        }
+        event.preventDefault();
+        var panel = form.closest("article");
+        if (!panel) {
+          return;
+        }
+        var queryString = new URLSearchParams(new FormData(form)).toString();
+        loadPanelContent(panel.querySelector(".js-panel-content"), queryString);
+      });
+
+      setCloseButtons();
+      updateGridLayout();
+    })();
+  </script>
 {% endblock %}

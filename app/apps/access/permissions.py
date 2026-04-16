@@ -17,6 +17,7 @@ def sync_server_view_perm(access_request: AccessRequest) -> None:
             server_id=access_request.server_id,
             status=AccessRequest.Status.APPROVED,
         )
+        .filter(Q(request_shell=True) | Q(request_logs=True) | Q(request_users=True))
         .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
         .exists()
     )

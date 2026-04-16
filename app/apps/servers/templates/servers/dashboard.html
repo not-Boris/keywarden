@@ -7,7 +7,7 @@
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
         <h1 class="text-2xl font-semibold tracking-tight text-gray-900">Servers</h1>
-        <p class="mt-1 text-sm text-gray-500">Review the servers you can access and their certificate status.</p>
+        <p class="mt-1 text-sm text-gray-500">Request access, review approvals, and open servers you are approved for.</p>
       </div>
       <span class="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
         {{ servers|length }} total
@@ -18,93 +18,122 @@
       <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {% for item in servers %}
           <article class="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-            <div class="flex items-start justify-between">
-              <div class="flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-700 text-sm font-semibold text-white">
-                  {{ item.server.initial }}
-                </div>
-                <div>
-                  <h2 class="text-lg font-semibold text-gray-900">{{ item.server.display_name }}</h2>
-                  <p class="text-xs text-gray-500">
-                    {{ item.server.hostname|default:item.server.ipv4|default:item.server.ipv6|default:"Unassigned" }}
-                  </p>
-                </div>
-              </div>
-              <div class="relative">
-                <button
-                  type="button"
-                  data-tooltip-target="server-status-{{ item.server.id }}"
-                  class="{% if item.status.is_active %}inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700{% else %}inline-flex items-center rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700{% endif %}"
-                >
-                  {{ item.status.label }}: {{ item.status.detail }}
-                </button>
-                <div
-                  id="server-status-{{ item.server.id }}"
-                  role="tooltip"
-                  class="invisible absolute z-10 inline-block w-64 rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700 shadow-sm opacity-0 transition-opacity"
-                >
-                  <div class="space-y-1">
-                    <div class="flex items-center justify-between">
-                      <span class="font-semibold text-gray-500">Status</span>
-                      <span class="font-medium text-gray-900">{{ item.status.label }}: {{ item.status.detail }}</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                      <span class="font-semibold text-gray-500">Ping</span>
-                      <span class="font-medium text-gray-900">
-                        {% if item.status.ping_ms is not None %}{{ item.status.ping_ms }}ms{% else %}—{% endif %}
-                      </span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                      <span class="font-semibold text-gray-500">Hostname</span>
-                      <span class="font-medium text-gray-900">{{ item.server.hostname|default:"—" }}</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                      <span class="font-semibold text-gray-500">IPv4</span>
-                      <span class="font-medium text-gray-900">{{ item.server.ipv4|default:"—" }}</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                      <span class="font-semibold text-gray-500">IPv6</span>
-                      <span class="font-medium text-gray-900">{{ item.server.ipv6|default:"—" }}</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                      <span class="font-semibold text-gray-500">Last heartbeat</span>
-                      <span class="font-medium text-gray-900">
-                        {% if item.status.heartbeat_at %}{{ item.status.heartbeat_at|date:"M j, Y H:i:s" }}{% else %}—{% endif %}
-                      </span>
-                    </div>
+            {% if item.access.granted %}
+              <div class="flex items-start justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-700 text-sm font-semibold text-white">
+                    {{ item.server.initial }}
                   </div>
-                  <div class="tooltip-arrow" data-popper-arrow></div>
+                  <div>
+                    <h2 class="text-lg font-semibold text-gray-900">{{ item.server.display_name }}</h2>
+                    <p class="text-xs text-gray-500">
+                      {{ item.server.hostname|default:item.server.ipv4|default:item.server.ipv6|default:"Unassigned" }}
+                    </p>
+                  </div>
+                </div>
+                <div class="relative">
+                  <button
+                    type="button"
+                    data-tooltip-target="server-status-{{ item.server.id }}"
+                    class="{% if item.status.is_active %}inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700{% else %}inline-flex items-center rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700{% endif %}"
+                  >
+                    {{ item.status.label }}: {{ item.status.detail }}
+                  </button>
+                  <div
+                    id="server-status-{{ item.server.id }}"
+                    role="tooltip"
+                    class="invisible absolute z-10 inline-block w-64 rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700 shadow-sm opacity-0 transition-opacity"
+                  >
+                    <div class="space-y-1">
+                      <div class="flex items-center justify-between">
+                        <span class="font-semibold text-gray-500">Status</span>
+                        <span class="font-medium text-gray-900">{{ item.status.label }}: {{ item.status.detail }}</span>
+                      </div>
+                      <div class="flex items-center justify-between">
+                        <span class="font-semibold text-gray-500">Ping</span>
+                        <span class="font-medium text-gray-900">
+                          {% if item.status.ping_ms is not None %}{{ item.status.ping_ms }}ms{% else %}—{% endif %}
+                        </span>
+                      </div>
+                      <div class="flex items-center justify-between">
+                        <span class="font-semibold text-gray-500">Hostname</span>
+                        <span class="font-medium text-gray-900">{{ item.server.hostname|default:"—" }}</span>
+                      </div>
+                      <div class="flex items-center justify-between">
+                        <span class="font-semibold text-gray-500">IPv4</span>
+                        <span class="font-medium text-gray-900">{{ item.server.ipv4|default:"—" }}</span>
+                      </div>
+                      <div class="flex items-center justify-between">
+                        <span class="font-semibold text-gray-500">IPv6</span>
+                        <span class="font-medium text-gray-900">{{ item.server.ipv6|default:"—" }}</span>
+                      </div>
+                      <div class="flex items-center justify-between">
+                        <span class="font-semibold text-gray-500">Last heartbeat</span>
+                        <span class="font-medium text-gray-900">
+                          {% if item.status.heartbeat_at %}{{ item.status.heartbeat_at|date:"M j, Y H:i:s" }}{% else %}—{% endif %}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="tooltip-arrow" data-popper-arrow></div>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <dl class="mt-5 divide-y divide-gray-100 text-sm text-gray-600">
-              <div class="flex items-center justify-between py-2">
-                <dt>Access until</dt>
-                <dd class="font-medium text-gray-900">
-                  {% if item.expires_at %}
-                    {{ item.expires_at|date:"M j, Y H:i" }}
-                  {% else %}
-                    No expiry
-                  {% endif %}
-                </dd>
+              <dl class="mt-5 divide-y divide-gray-100 text-sm text-gray-600">
+                <div class="flex items-center justify-between py-2">
+                  <dt>Access until</dt>
+                  <dd class="font-medium text-gray-900">
+                    {% if item.expires_at %}
+                      {{ item.expires_at|date:"M j, Y H:i" }}
+                    {% else %}
+                      No expiry
+                    {% endif %}
+                  </dd>
+                </div>
+                <div class="flex items-center justify-between py-2">
+                  <dt>Scopes</dt>
+                  <dd class="font-medium text-gray-900">
+                    <div class="flex flex-wrap justify-end gap-1">
+                      {% if item.access.can_shell %}<span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Shell</span>{% endif %}
+                      {% if item.access.can_logs %}<span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Logs</span>{% endif %}
+                      {% if item.access.can_users %}<span class="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Users</span>{% endif %}
+                    </div>
+                  </dd>
+                </div>
+              </dl>
+              <div class="mt-5 flex items-center justify-between border-t border-gray-100 pt-4 text-xs text-gray-500">
+                <span>Certificates and access</span>
+                {% if item.access.can_users %}
+                  <a href="{% url 'servers:detail' item.server.id %}" class="font-semibold text-blue-700 hover:underline">View details</a>
+                {% elif item.access.can_logs %}
+                  <a href="{% url 'servers:audit' item.server.id %}" class="font-semibold text-blue-700 hover:underline">Open audit</a>
+                {% elif item.access.can_shell %}
+                  <a href="{% url 'servers:shell' item.server.id %}" class="font-semibold text-blue-700 hover:underline">Open shell</a>
+                {% endif %}
               </div>
-              <div class="flex items-center justify-between py-2">
-                <dt>Last accessed</dt>
-                <dd class="font-medium text-gray-900">
-                  {% if item.last_accessed %}
-                    {{ item.last_accessed|date:"M j, Y H:i" }}
-                  {% else %}
-                    —
-                  {% endif %}
-                </dd>
+            {% else %}
+              <div class="flex items-start justify-between">
+                <div>
+                  <h2 class="text-lg font-semibold text-gray-900">{{ item.server.hostname|default:"Unassigned" }}</h2>
+                  <p class="mt-1 text-xs text-gray-500">No access granted</p>
+                </div>
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">Hostname only</span>
               </div>
-            </dl>
-
-            <div class="mt-5 flex items-center justify-between border-t border-gray-100 pt-4 text-xs text-gray-500">
-              <span>Certificates and access</span>
-              <a href="{% url 'servers:detail' item.server.id %}" class="font-semibold text-blue-700 hover:underline">View details</a>
-            </div>
+              <div class="mt-5 border-t border-gray-100 pt-4">
+                {% if item.access.pending %}
+                  <span class="inline-flex items-center rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800">
+                    Request pending since {{ item.access.pending.requested_at|date:"M j, Y H:i" }}
+                  </span>
+                {% else %}
+                  <form method="post" action="{% url 'servers:request_access' item.server.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-800">
+                      Request access
+                    </button>
+                  </form>
+                {% endif %}
+                <p class="mt-2 text-xs text-gray-500">Request includes shell, logs, and users scopes.</p>
+              </div>
+            {% endif %}
           </article>
         {% endfor %}
       </div>
@@ -116,8 +145,8 @@
             <circle cx="12" cy="12" r="9" stroke-width="1.5"></circle>
           </svg>
         </div>
-        <h2 class="mt-4 text-lg font-semibold text-gray-900">No server access yet</h2>
-        <p class="mt-2 text-sm text-gray-600">Request access to a server to see it listed here.</p>
+        <h2 class="mt-4 text-lg font-semibold text-gray-900">No servers yet</h2>
+        <p class="mt-2 text-sm text-gray-600">Create or enroll a server to start handling access requests.</p>
       </div>
     {% endif %}
   </div>

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load tz %}
 
 {% block title %}Settings • {{ server.display_name }} • Keywarden{% endblock %}
 
@@ -7,22 +8,130 @@
     {% include "servers/_header.html" %}
 
     <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-      <div class="flex flex-wrap items-start justify-between gap-4">
+      <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 pb-4">
         <div>
-          <h2 class="text-lg font-semibold text-gray-900">Settings</h2>
-          <p class="mt-1 text-sm text-gray-500">Manage server-level access policies and metadata.</p>
+          <h2 class="text-lg font-semibold text-gray-900">Server status</h2>
+          <p class="mt-1 text-sm text-gray-500">Current enrollment and telemetry posture for this host.</p>
         </div>
-        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">Placeholder</span>
       </div>
-      <div class="mt-5 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
-        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-700">
-          <svg class="h-6 w-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6l4 2" />
-            <circle cx="12" cy="12" r="9" stroke-width="1.5"></circle>
-          </svg>
+      <dl class="mt-4 divide-y divide-gray-100 text-sm text-gray-700">
+        <div class="flex items-center justify-between py-2">
+          <dt class="text-gray-500">Agent enrolled</dt>
+          <dd class="font-medium text-gray-900">{% if server.agent_enrolled_at %}Yes{% else %}No{% endif %}</dd>
         </div>
-        <p class="mt-3 text-sm text-gray-600">Settings will appear here as server options are added.</p>
+        <div class="flex items-center justify-between py-2">
+          <dt class="text-gray-500">Enrollment timestamp</dt>
+          <dd class="font-medium text-gray-900">{{ server.agent_enrolled_at|utc|date:"M j, Y H:i:s"|default:"—" }}{% if server.agent_enrolled_at %} UTC{% endif %}</dd>
+        </div>
+        <div class="flex items-center justify-between py-2">
+          <dt class="text-gray-500">Last heartbeat</dt>
+          <dd class="font-medium text-gray-900">{{ server.last_heartbeat_at|utc|date:"M j, Y H:i:s"|default:"—" }}{% if server.last_heartbeat_at %} UTC{% endif %}</dd>
+        </div>
+        <div class="flex items-center justify-between py-2">
+          <dt class="text-gray-500">Last ping</dt>
+          <dd class="font-medium text-gray-900">{% if server.last_ping_ms is not None %}{{ server.last_ping_ms }}ms{% else %}—{% endif %}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 pb-4">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">Audit pipeline</h2>
+          <p class="mt-1 text-sm text-gray-500">Visibility into agent log ingestion and category distribution.</p>
+        </div>
       </div>
+      <dl class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+          <dt class="text-xs uppercase tracking-wide text-gray-500">Total logs</dt>
+          <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ audit_summary.total_count }}</dd>
+        </div>
+        <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+          <dt class="text-xs uppercase tracking-wide text-gray-500">Last 24h</dt>
+          <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ audit_summary.recent_24h_count }}</dd>
+        </div>
+        <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+          <dt class="text-xs uppercase tracking-wide text-gray-500">Last event</dt>
+          <dd class="mt-1 text-sm font-semibold text-gray-900">{{ audit_summary.last_event_at|utc|date:"M j, Y H:i:s"|default:"—" }}{% if audit_summary.last_event_at %} UTC{% endif %}</dd>
+        </div>
+        <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+          <dt class="text-xs uppercase tracking-wide text-gray-500">Last ingest</dt>
+          <dd class="mt-1 text-sm font-semibold text-gray-900">{{ audit_summary.last_ingest_at|utc|date:"M j, Y H:i:s"|default:"—" }}{% if audit_summary.last_ingest_at %} UTC{% endif %}</dd>
+        </div>
+      </dl>
+      <div class="mt-4">
+        <h3 class="text-sm font-semibold text-gray-900">Top categories</h3>
+        {% if audit_summary.top_categories %}
+          <ul class="mt-2 space-y-2 text-sm text-gray-700">
+            {% for item in audit_summary.top_categories %}
+              <li class="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2">
+                <span class="font-medium text-gray-900">{{ item.category }}</span>
+                <span class="text-gray-500">{{ item.total }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="mt-2 text-sm text-gray-500">No agent logs have been ingested yet.</p>
+        {% endif %}
+      </div>
+      <div class="mt-5 border-t border-gray-100 pt-4">
+        <a href="{% url 'servers:audit' server.id %}" class="inline-flex items-center rounded-lg bg-blue-700 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-800">
+          Open audit log viewer
+        </a>
+      </div>
+    </section>
+
+    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 pb-4">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">Log source configuration</h2>
+          <p class="mt-1 text-sm text-gray-500">These sources are consumed by the agent from the central server config.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="{{ admin_server_url }}" class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+            Configure Inline
+          </a>
+          <a href="{{ admin_log_sources_url }}" class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800">
+            Open Log Source Admin
+          </a>
+        </div>
+      </div>
+      {% if log_sources %}
+        <div class="mt-4 overflow-x-auto rounded-xl border border-gray-200">
+          <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th class="px-3 py-2 font-semibold">Type</th>
+                <th class="px-3 py-2 font-semibold">Name</th>
+                <th class="px-3 py-2 font-semibold">Service/File</th>
+                <th class="px-3 py-2 font-semibold">Parser</th>
+                <th class="px-3 py-2 font-semibold">Matches</th>
+                <th class="px-3 py-2 font-semibold">Overrides</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 text-gray-700">
+              {% for source in log_sources %}
+                <tr>
+                  <td class="px-3 py-2">{{ source.kind }}</td>
+                  <td class="px-3 py-2">{{ source.name|default:"—" }}</td>
+                  <td class="px-3 py-2">{{ source.service_unit|default:source.file_path|default:"—" }}</td>
+                  <td class="px-3 py-2">{{ source.parser|default:"none" }}</td>
+                  <td class="px-3 py-2 text-xs text-gray-600">
+                    in={{ source.include_matches|default:"{}" }}<br>
+                    out={{ source.exclude_matches|default:"{}" }}
+                  </td>
+                  <td class="px-3 py-2">
+                    {{ source.category_override|default:"(category default)" }} / {{ source.event_type_override|default:"(event default)" }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="mt-4 text-sm text-gray-500">No custom log sources defined. Defaults are used by the agent.</p>
+      {% endif %}
+      <p class="mt-4 text-xs text-gray-500">Use the admin buttons above to configure per-server monitors (journal/service/file), parser mode, and include/exclude matches.</p>
     </section>
   </div>
 {% endblock %}

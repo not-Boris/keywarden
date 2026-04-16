@@ -28,12 +28,28 @@ type Client struct {
 	scheme  string
 	host    string
 	addr    string
+	token   string
+}
+
+func normalizeAgentToken(raw string) string {
+	token := strings.TrimSpace(raw)
+	if token == "" {
+		return ""
+	}
+	if len(token) > 7 && strings.EqualFold(token[:7], "Bearer ") {
+		token = strings.TrimSpace(token[7:])
+	}
+	return token
 }
 
 func New(cfg *config.Config) (*Client, error) {
 	baseURL := strings.TrimRight(cfg.ServerURL, "/")
 	if baseURL == "" {
 		return nil, errors.New("server url is required")
+	}
+	agentToken := normalizeAgentToken(cfg.AgentAPIToken)
+	if agentToken == "" {
+		return nil, errors.New("agent api token is required (set agent_api_token or KEYWARDEN_AGENT_API_TOKEN)")
 	}
 	cert, err := tls.LoadX509KeyPair(cfg.ClientCertPath(), cfg.ClientKeyPath())
 	if err != nil {
@@ -97,7 +113,15 @@ func New(cfg *config.Config) (*Client, error) {
 		scheme:  scheme,
 		host:    host,
 		addr:    addr,
+		token:   agentToken,
 	}, nil
+}
+
+func (c *Client) setAuth(req *http.Request) {
+	if c.token == "" {
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
 }
 
 type EnrollRequest struct {
@@ -113,6 +137,7 @@ type EnrollResponse struct {
 	ServerID    string `json:"server_id"`
 	ClientCert  string `json:"client_cert_pem"`
 	CACert      string `json:"ca_cert_pem"`
+	AgentToken  string `json:"agent_api_token,omitempty"`
 	SyncProfile string `json:"sync_profile,omitempty"`
 	DisplayName string `json:"display_name,omitempty"`
 }
@@ -147,6 +172,19 @@ type SyncReportRequest struct {
 	Message      string             `json:"message,omitempty"`
 	Metadata     map[string]any     `json:"metadata,omitempty"`
 	Accounts     []AccountSyncEntry `json:"accounts,omitempty"`
+}
+
+type LogSourceConfig struct {
+	SourceID       string              `json:"source_id"`
+	Kind           string              `json:"kind"`
+	Name           string              `json:"name"`
+	ServiceUnit    string              `json:"service_unit,omitempty"`
+	FilePath       string              `json:"file_path,omitempty"`
+	Parser         string              `json:"parser,omitempty"`
+	IncludeMatches map[string][]string `json:"include_matches,omitempty"`
+	ExcludeMatches map[string][]string `json:"exclude_matches,omitempty"`
+	Category       string              `json:"category"`
+	EventType      string              `json:"event_type"`
 }
 
 func Enroll(ctx context.Context, serverURL string, req EnrollRequest) (*EnrollResponse, error) {
@@ -241,6 +279,7 @@ func (c *Client) FetchAccountAccess(ctx context.Context, serverID string) ([]Acc
 	if err != nil {
 		return nil, fmt.Errorf("build account access request: %w", err)
 	}
+	c.setAuth(req)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch account access: %w", err)
@@ -266,6 +305,7 @@ func (c *Client) FetchUserCA(ctx context.Context, serverID string) (*UserCARespo
 	if err != nil {
 		return nil, fmt.Errorf("build user ca request: %w", err)
 	}
+	c.setAuth(req)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch user ca: %w", err)
@@ -299,6 +339,7 @@ func (c *Client) SendSyncReport(ctx context.Context, serverID string, report Syn
 		return fmt.Errorf("build sync report: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	c.setAuth(req)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return fmt.Errorf("send sync report: %w", err)
@@ -310,12 +351,39 @@ func (c *Client) SendSyncReport(ctx context.Context, serverID string, report Syn
 	return nil
 }
 
+func (c *Client) FetchLogConfig(ctx context.Context, serverID string) ([]LogSourceConfig, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		c.baseURL+"/agent/servers/"+serverID+"/log-config",
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build log config request: %w", err)
+	}
+	c.setAuth(req)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch log config: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return nil, &HTTPStatusError{StatusCode: resp.StatusCode, Status: resp.Status}
+	}
+	var out []LogSourceConfig
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode log config: %w", err)
+	}
+	return out, nil
+}
+
 func (c *Client) SendLogBatch(ctx context.Context, serverID string, payload []byte) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/agent/servers/"+serverID+"/logs", bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("build log request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	c.setAuth(req)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return fmt.Errorf("send log batch: %w", err)
@@ -344,6 +412,7 @@ func (c *Client) UpdateHost(ctx context.Context, serverID string, reqBody Heartb
 		return fmt.Errorf("build host update: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	c.setAuth(req)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return fmt.Errorf("send host update: %w", err)

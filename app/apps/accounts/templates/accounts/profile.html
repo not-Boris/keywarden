@@ -207,6 +207,32 @@
     <aside class="space-y-6 lg:sticky lg:top-6">
       <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div class="space-y-2">
+          <h2 class="text-base font-semibold text-gray-900">Interface display mode</h2>
+          <p class="text-sm text-gray-500">Choose how wide workspace pages render.</p>
+        </div>
+        <div class="mt-4 inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+          <button
+            type="button"
+            class="js-display-mode-btn rounded-md px-3 py-1.5 text-xs font-semibold text-gray-600 transition"
+            data-display-mode="compact"
+          >
+            Compact
+          </button>
+          <button
+            type="button"
+            class="js-display-mode-btn rounded-md px-3 py-1.5 text-xs font-semibold text-gray-600 transition"
+            data-display-mode="full"
+          >
+            Full
+          </button>
+        </div>
+        <p class="mt-3 text-xs text-gray-500">
+          Compact keeps the current constrained view. Full expands to near full-width for denser audit/log tables.
+        </p>
+      </section>
+
+      <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div class="space-y-2">
           <h2 class="text-base font-semibold text-gray-900">Single Sign-On</h2>
           <p class="text-sm text-gray-500">Manage how you authenticate with external providers.</p>
         </div>
@@ -385,6 +411,31 @@
           });
       }
 
+      function setDisplayModeButtonState(button, isActive) {
+        if (isActive) {
+          button.classList.remove("text-gray-600");
+          button.classList.add("bg-blue-700", "text-white", "shadow-sm");
+          return;
+        }
+        button.classList.remove("bg-blue-700", "text-white", "shadow-sm");
+        button.classList.add("text-gray-600");
+      }
+
+      function currentDisplayMode() {
+        if (typeof window.keywardenGetDisplayMode === "function") {
+          return window.keywardenGetDisplayMode();
+        }
+        return document.documentElement.getAttribute("data-display-mode") === "full" ? "full" : "compact";
+      }
+
+      function applyDisplayModeUi(mode) {
+        var buttons = document.querySelectorAll(".js-display-mode-btn");
+        for (var i = 0; i < buttons.length; i += 1) {
+          var button = buttons[i];
+          setDisplayModeButtonState(button, button.getAttribute("data-display-mode") === mode);
+        }
+      }
+
       var downloadButtons = document.querySelectorAll("[data-download-url]");
       for (var i = 0; i < downloadButtons.length; i += 1) {
         downloadButtons[i].addEventListener("click", handleDownload);
@@ -393,6 +444,32 @@
       for (var j = 0; j < buttons.length; j += 1) {
         buttons[j].addEventListener("click", handleRegenerate);
       }
+
+      var displayModeButtons = document.querySelectorAll(".js-display-mode-btn");
+      for (var k = 0; k < displayModeButtons.length; k += 1) {
+        displayModeButtons[k].addEventListener("click", function (event) {
+          var target = event.currentTarget;
+          if (!(target instanceof HTMLElement)) {
+            return;
+          }
+          var mode = target.getAttribute("data-display-mode") || "compact";
+          if (typeof window.keywardenSetDisplayMode === "function") {
+            window.keywardenSetDisplayMode(mode);
+          } else {
+            document.documentElement.setAttribute("data-display-mode", mode === "full" ? "full" : "compact");
+          }
+          applyDisplayModeUi(currentDisplayMode());
+        });
+      }
+
+      window.addEventListener("keywarden:display-mode", function (event) {
+        var mode = currentDisplayMode();
+        if (event && event.detail && event.detail.mode) {
+          mode = event.detail.mode === "full" ? "full" : "compact";
+        }
+        applyDisplayModeUi(mode);
+      });
+      applyDisplayModeUi(currentDisplayMode());
     })();
   </script>
 {% endblock %}

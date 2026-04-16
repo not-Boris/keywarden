@@ -28,6 +28,7 @@ class Server(models.Model):
     agent_enrolled_at = models.DateTimeField(null=True, blank=True)
     agent_cert_fingerprint = models.CharField(max_length=128, null=True, blank=True)
     agent_cert_serial = models.CharField(max_length=64, null=True, blank=True)
+    agent_api_token_hash = models.CharField(max_length=64, null=True, blank=True, db_index=True)
     last_heartbeat_at = models.DateTimeField(null=True, blank=True, db_index=True)
     last_ping_ms = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -189,3 +190,84 @@ class ServerAccount(models.Model):
 
     def __str__(self) -> str:
         return f"{self.system_username} ({self.server_id})"
+
+
+class ServerAuditLog(models.Model):
+    server = models.ForeignKey(Server, on_delete=models.CASCADE, related_name="audit_logs")
+    event_at = models.DateTimeField(db_index=True)
+    received_at = models.DateTimeField(default=timezone.now, editable=False, db_index=True)
+    category = models.CharField(max_length=64, db_index=True)
+    event_type = models.CharField(max_length=128, db_index=True)
+    source_kind = models.CharField(max_length=16, blank=True, db_index=True)
+    source_name = models.CharField(max_length=512, blank=True, db_index=True)
+    unit = models.CharField(max_length=128, blank=True)
+    priority = models.CharField(max_length=16, blank=True, db_index=True)
+    hostname = models.CharField(max_length=253, blank=True)
+    username = models.CharField(max_length=150, blank=True, db_index=True)
+    principal = models.CharField(max_length=255, blank=True)
+    source_ip = models.GenericIPAddressField(null=True, blank=True)
+    session_id = models.CharField(max_length=128, blank=True)
+    message = models.TextField(blank=True)
+    raw = models.TextField(blank=True)
+    fields = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "Server audit log"
+        verbose_name_plural = "Server audit logs"
+        indexes = [
+            models.Index(fields=["server", "event_at"], name="servers_audit_server_event_idx"),
+            models.Index(fields=["server", "category", "event_at"], name="servers_audit_cat_event_idx"),
+            models.Index(fields=["server", "event_type", "event_at"], name="servers_audit_type_event_idx"),
+            models.Index(fields=["server", "source_kind", "event_at"], name="servers_audit_kind_event_idx"),
+            models.Index(fields=["server", "source_name", "event_at"], name="servers_audit_name_event_idx"),
+            models.Index(fields=["server", "username", "event_at"], name="servers_audit_user_event_idx"),
+            models.Index(fields=["server", "source_ip", "event_at"], name="servers_audit_ip_event_idx"),
+        ]
+        ordering = ["-event_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"{self.server_id}:{self.category}/{self.event_type}@{self.event_at.isoformat()}"
+
+
+class ServerLogSource(models.Model):
+    class Kind(models.TextChoices):
+        JOURNAL = "journal", "Journal"
+        SERVICE = "service", "Service"
+        FILE = "file", "File"
+
+    class Parser(models.TextChoices):
+        NONE = "none", "None"
+        SYSLOG = "syslog", "Syslog"
+        NGINX_ACCESS = "nginx_access", "Nginx Access"
+        JSON = "json", "JSON"
+
+    server = models.ForeignKey(Server, on_delete=models.CASCADE, related_name="log_sources")
+    kind = models.CharField(max_length=16, choices=Kind.choices, db_index=True)
+    name = models.CharField(max_length=128, blank=True)
+    service_unit = models.CharField(max_length=128, blank=True)
+    file_path = models.CharField(max_length=512, blank=True)
+    parser = models.CharField(max_length=32, choices=Parser.choices, default=Parser.NONE)
+    include_matches = models.JSONField(default=dict, blank=True)
+    exclude_matches = models.JSONField(default=dict, blank=True)
+    category_override = models.CharField(max_length=64, blank=True)
+    event_type_override = models.CharField(max_length=128, blank=True)
+    enabled = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Server log source"
+        verbose_name_plural = "Server log sources"
+        ordering = ["server_id", "kind", "name", "id"]
+        indexes = [
+            models.Index(fields=["server", "enabled", "kind"], name="srvsrc_srv_en_kind_idx"),
+            models.Index(fields=["server", "service_unit"], name="srvsrc_srv_svc_idx"),
+            models.Index(fields=["server", "file_path"], name="servers_src_server_file_idx"),
+        ]
+
+    def __str__(self) -> str:
+        if self.kind == self.Kind.SERVICE:
+            return self.name or self.service_unit or f"service:{self.id}"
+        if self.kind == self.Kind.JOURNAL:
+            return self.name or f"journal:{self.id}"
+        return self.name or self.file_path or f"file:{self.id}"

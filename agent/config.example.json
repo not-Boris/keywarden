@@ -1,9 +1,59 @@
 {
-  "server_url": "https://keywarden.dev.ntbx.io/api/v1",
-  "server_id": "4",
-  "server_ca_path": "",
+  "server_url": "https://keywarden.example.com/api/v1",
+  "server_id": "6",
+  "agent_api_token": "HV8MnbysmINShu9wkXzzNrQE5NyRlPJHfP2aU6SX4HERrlac8EQpoMEu02FX1TYv",
   "sync_interval_seconds": 5,
-  "log_batch_size": 500,
+  "log_batch_size": 2000,
+  "log_sources": [
+    {
+      "source_id": "journal-all",
+      "kind": "journal",
+      "name": "All Journal",
+      "category": "system",
+      "event_type": "system",
+      "parser": "none",
+      "include_matches": {},
+      "exclude_matches": {}
+    },
+    {
+      "source_id": "journal-kernel",
+      "kind": "journal",
+      "name": "Kernel Journal",
+      "category": "system",
+      "event_type": "kernel",
+      "parser": "none",
+      "include_matches": {
+        "_TRANSPORT": ["kernel"]
+      }
+    },
+    {
+      "source_id": "service-ssh",
+      "kind": "service",
+      "name": "OpenSSH",
+      "service_unit": "ssh.service",
+      "category": "access",
+      "event_type": "ssh",
+      "parser": "none"
+    },
+    {
+      "source_id": "file-auth",
+      "kind": "file",
+      "name": "Auth Log",
+      "file_path": "/var/log/auth.log",
+      "category": "auth",
+      "event_type": "file.line",
+      "parser": "syslog"
+    },
+    {
+      "source_id": "file-nginx-access",
+      "kind": "file",
+      "name": "Nginx Access",
+      "file_path": "/var/log/nginx/access.log",
+      "category": "access",
+      "event_type": "http.access",
+      "parser": "nginx_access"
+    }
+  ],
   "state_dir": "/var/lib/keywarden-agent",
   "account_policy": {
     "username_template": "{{username}}_{{user_id}}",

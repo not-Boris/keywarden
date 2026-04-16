@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -26,12 +27,28 @@ type AccountPolicy struct {
 	LockOnRevoke     bool   `json:"lock_on_revoke"`
 }
 
+type LogSource struct {
+	SourceID       string              `json:"source_id,omitempty"`
+	Kind           string              `json:"kind"`
+	Name           string              `json:"name,omitempty"`
+	ServiceUnit    string              `json:"service_unit,omitempty"`
+	FilePath       string              `json:"file_path,omitempty"`
+	Parser         string              `json:"parser,omitempty"`
+	IncludeMatches map[string][]string `json:"include_matches,omitempty"`
+	ExcludeMatches map[string][]string `json:"exclude_matches,omitempty"`
+	Category       string              `json:"category,omitempty"`
+	EventType      string              `json:"event_type,omitempty"`
+	Enabled        *bool               `json:"enabled,omitempty"`
+}
+
 type Config struct {
 	ServerURL           string        `json:"server_url"`
 	ServerID            string        `json:"server_id,omitempty"`
+	AgentAPIToken       string        `json:"agent_api_token,omitempty"`
 	ServerCAPath        string        `json:"server_ca_path,omitempty"`
 	SyncIntervalSeconds int           `json:"sync_interval_seconds,omitempty"`
 	LogBatchSize        int           `json:"log_batch_size,omitempty"`
+	LogSources          []LogSource   `json:"log_sources,omitempty"`
 	StateDir            string        `json:"state_dir,omitempty"`
 	AccountPolicy       AccountPolicy `json:"account_policy,omitempty"`
 }
@@ -48,7 +65,11 @@ func LoadOrInit(path string, serverURL string) (*Config, error) {
 		if serverURL == "" {
 			return nil, errors.New("server url required for first boot")
 		}
-		cfg := &Config{ServerURL: serverURL, ServerCAPath: os.Getenv("KEYWARDEN_SERVER_CA_PATH")}
+		cfg := &Config{
+			ServerURL:     serverURL,
+			AgentAPIToken: os.Getenv("KEYWARDEN_AGENT_API_TOKEN"),
+			ServerCAPath:  os.Getenv("KEYWARDEN_SERVER_CA_PATH"),
+		}
 		applyDefaults(cfg)
 		if err := validate(cfg, false); err != nil {
 			return nil, err
@@ -62,8 +83,14 @@ func LoadOrInit(path string, serverURL string) (*Config, error) {
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
+	envAgentToken := strings.TrimSpace(os.Getenv("KEYWARDEN_AGENT_API_TOKEN"))
 	if cfg.ServerCAPath == "" {
 		cfg.ServerCAPath = os.Getenv("KEYWARDEN_SERVER_CA_PATH")
+	}
+	// Environment should win when set so operators can rotate tokens centrally
+	// without editing persisted agent.json on every node.
+	if envAgentToken != "" {
+		cfg.AgentAPIToken = envAgentToken
 	}
 	applyDefaults(cfg)
 	if err := validate(cfg, false); err != nil {
@@ -108,6 +135,8 @@ func applyDefaults(cfg *Config) {
 }
 
 func validate(cfg *Config, requireServerID bool) error {
+	cfg.ServerID = strings.TrimSpace(cfg.ServerID)
+	cfg.AgentAPIToken = strings.TrimSpace(cfg.AgentAPIToken)
 	var missing []string
 	if cfg.ServerURL == "" {
 		missing = append(missing, "server_url")
@@ -118,10 +147,55 @@ func validate(cfg *Config, requireServerID bool) error {
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required config fields: %v", missing)
 	}
+	if looksLikePlaceholder(cfg.ServerID) {
+		return errors.New("invalid server_id placeholder in config; remove server_id and re-enroll the agent")
+	}
+	if cfg.ServerID != "" {
+		if _, err := strconv.Atoi(cfg.ServerID); err != nil {
+			return errors.New("invalid server_id in config; expected numeric server id from enrollment")
+		}
+	}
+	if looksLikePlaceholder(cfg.AgentAPIToken) {
+		return errors.New("invalid agent_api_token placeholder in config; remove agent_api_token and re-enroll the agent")
+	}
 	if cfg.SyncIntervalSeconds < 5 {
 		return errors.New("sync_interval_seconds must be >= 5")
 	}
+	for i, source := range cfg.LogSources {
+		kind := strings.ToLower(strings.TrimSpace(source.Kind))
+		switch kind {
+		case "journal":
+			// journal source is valid with optional include/exclude matches.
+		case "service":
+			if strings.TrimSpace(source.ServiceUnit) == "" && strings.TrimSpace(source.Name) == "" {
+				return fmt.Errorf("log_sources[%d]: service source requires service_unit or name", i)
+			}
+		case "file":
+			if strings.TrimSpace(source.FilePath) == "" && strings.TrimSpace(source.Name) == "" {
+				return fmt.Errorf("log_sources[%d]: file source requires file_path or name", i)
+			}
+		default:
+			return fmt.Errorf("log_sources[%d]: kind must be 'journal', 'service' or 'file'", i)
+		}
+		parser := strings.ToLower(strings.TrimSpace(source.Parser))
+		if parser == "" {
+			continue
+		}
+		switch parser {
+		case "none", "syslog", "nginx_access", "json":
+		default:
+			return fmt.Errorf("log_sources[%d]: parser must be one of none|syslog|nginx_access|json", i)
+		}
+	}
 	return nil
+}
+
+func looksLikePlaceholder(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	return strings.Contains(value, "<") || strings.Contains(value, ">")
 }
 
 func (c *Config) ClientCertPath() string {
@@ -142,6 +216,28 @@ func (c *Config) LogCursorPath() string {
 
 func (c *Config) LogSpoolDir() string {
 	return c.StateDir + "/spool"
+}
+
+func (c *Config) LogOffsetsPath() string {
+	return c.StateDir + "/log.offsets.json"
+}
+
+func (c *Config) LogStatePath() string {
+	return c.StateDir + "/log.state.json"
+}
+
+func (c *Config) EnabledLogSources() []LogSource {
+	if len(c.LogSources) == 0 {
+		return nil
+	}
+	out := make([]LogSource, 0, len(c.LogSources))
+	for _, source := range c.LogSources {
+		if source.Enabled != nil && !*source.Enabled {
+			continue
+		}
+		out = append(out, source)
+	}
+	return out
 }
 
 func dir(path string) string {

@@ -240,6 +240,7 @@
       var startButton = document.getElementById("shell-start");
       var activeSocket = null;
       var activeTerm = null;
+      var activeResizeHandler = null;
       var popoutShell = document.getElementById("shell-popout-shell");
       var isPopout = {{ is_popout|yesno:"true,false" }};
 
@@ -283,19 +284,40 @@
         startButton.classList.toggle("hover:bg-blue-800", !isRunning);
       }
 
-      function stopTerminal() {
-        if (activeSocket) {
+      function disposeTerminal() {
+        if (activeResizeHandler) {
+          window.removeEventListener("resize", activeResizeHandler);
+          activeResizeHandler = null;
+        }
+        if (activeTerm) {
+          try {
+            activeTerm.dispose();
+          } catch (err) {
+            // noop
+          }
+          activeTerm = null;
+        }
+        if (termContainer) {
+          termContainer.innerHTML = "";
+        }
+      }
+
+      function stopTerminal(options) {
+        var opts = options || {};
+        if (!opts.skipSocketClose && activeSocket) {
           try {
             activeSocket.close();
           } catch (err) {
             // noop
           }
         }
+        activeSocket = null;
         if (termContainer) {
           termContainer.dataset.started = "0";
         }
-        activeSocket = null;
-        activeTerm = null;
+        if (opts.disposeTerminal) {
+          disposeTerminal();
+        }
         setButtonState(false);
       }
 
@@ -303,6 +325,7 @@
         if (!termContainer || !window.Terminal || termContainer.dataset.started === "1") {
           return;
         }
+        disposeTerminal();
         termContainer.dataset.started = "1";
         if (startButton) {
           startButton.disabled = true;
@@ -343,8 +366,16 @@
         socket.onclose = function () {
           term.write("\r\nSession closed.\r\n");
           if (activeSocket === socket) {
-            stopTerminal();
+            // Keep the closed terminal output visible until the next start.
+            stopTerminal({
+              skipSocketClose: true,
+              disposeTerminal: false,
+            });
           }
+        };
+
+        socket.onerror = function () {
+          term.write("\r\nConnection error.\r\n");
         };
 
         term.onData(function (data) {
@@ -356,11 +387,11 @@
         setButtonState(true);
 
         if (isPopout) {
-          var onResize = function () {
+          activeResizeHandler = function () {
             sizePopoutTerminal();
             fitTerminal(term);
           };
-          window.addEventListener("resize", onResize);
+          window.addEventListener("resize", activeResizeHandler);
         }
       }
 
@@ -373,7 +404,7 @@
         if (startButton) {
           startButton.addEventListener("click", function () {
             if (termContainer.dataset.started === "1") {
-              stopTerminal();
+              stopTerminal({ disposeTerminal: true });
               return;
             }
             startTerminal();
