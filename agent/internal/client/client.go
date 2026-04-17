@@ -48,9 +48,6 @@ func New(cfg *config.Config) (*Client, error) {
 		return nil, errors.New("server url is required")
 	}
 	agentToken := normalizeAgentToken(cfg.AgentAPIToken)
-	if agentToken == "" {
-		return nil, errors.New("agent api token is required (set agent_api_token or KEYWARDEN_AGENT_API_TOKEN)")
-	}
 	cert, err := tls.LoadX509KeyPair(cfg.ClientCertPath(), cfg.ClientKeyPath())
 	if err != nil {
 		return nil, fmt.Errorf("load client cert: %w", err)

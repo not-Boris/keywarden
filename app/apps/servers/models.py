@@ -12,6 +12,8 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 
+from apps.core.secret_files import looks_like_pem, read_secret_ref, write_secret_file
+
 
 hostname_validator = RegexValidator(
     regex=r"^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*\.?$",
@@ -136,8 +138,20 @@ class AgentCertificateAuthority(models.Model):
         self.is_active = False
         self.revoked_at = timezone.now()
 
+    def get_key_pem(self) -> str:
+        file_payload = read_secret_ref(self.key_pem, label="Agent CA private key")
+        if file_payload:
+            return file_payload
+        inline_payload = (self.key_pem or "").strip()
+        if looks_like_pem(inline_payload):
+            self.key_pem = write_secret_file("agent-ca-key", inline_payload)
+            if self.pk:
+                self.save(update_fields=["key_pem"])
+            return inline_payload
+        return ""
+
     def ensure_material(self) -> None:
-        if self.cert_pem and self.key_pem:
+        if self.cert_pem and self.get_key_pem():
             return
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, self.name)])
@@ -160,7 +174,7 @@ class AgentCertificateAuthority(models.Model):
             encryption_algorithm=serialization.NoEncryption(),
         ).decode("utf-8")
         self.cert_pem = cert_pem
-        self.key_pem = key_pem
+        self.key_pem = write_secret_file("agent-ca-key", key_pem)
         self.fingerprint = cert.fingerprint(hashes.SHA256()).hex()
         self.serial = format(cert.serial_number, "x")
 

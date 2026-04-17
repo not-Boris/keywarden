@@ -1,0 +1,13 @@
+flowchart LR
+  User[User Browser] --> Web[Keywarden UI/API]
+  Admin[Admin Browser] --> Web
+  Web <--> IdP[OIDC Provider]
+  Web --> PG[(PostgreSQL)]
+  Web --> Cache[(Valkey/Redis)]
+  Web --> CA[(SSH User CA)]
+  Agent[Linux Agent] --> Web
+  Agent --> SSH[Managed Server SSHD]
+  User --> SSH
+  Web -. optional .-> Shell[Browser Shell WS Proxy]
+  Shell --> SSH
+

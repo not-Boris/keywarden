@@ -15,7 +15,7 @@ from apps.core.rbac import ROLE_USER, get_user_role, require_perms, set_user_rol
 class UserCreateIn(Schema):
     email: EmailStr
     password: str = Field(min_length=8)
-    role: Literal["administrator", "operator", "auditor", "user", "admin"]
+    role: Literal["administrator", "user", "admin"]
 
 
 class UserListOut(Schema):
@@ -34,7 +34,7 @@ class UserDetailOut(Schema):
 
 class UserUpdateIn(Schema):
     password: str | None = Field(default=None, min_length=8)
-    role: Literal["administrator", "operator", "auditor", "user", "admin"] | None = None
+    role: Literal["administrator", "user", "admin"] | None = None
     is_active: bool | None = None
 
 
@@ -55,7 +55,7 @@ def build_router() -> Router:
         """Create a platform user and assign a Keywarden role.
 
         Auth: required.
-        Permissions: requires `auth.add_user` (admin/operator).
+        Permissions: requires `auth.add_user` (administrator).
         Behavior: uses email as username, hashes the password, and assigns a
         role which maps to Keywarden group permissions.
         Rationale: enables automation and external admin workflows; mirrors

@@ -36,7 +36,7 @@ Endpoints:
 - `GET /api/v1/keys/{key_id}/certificate` downloads the certificate.
 - `GET /api/v1/keys/{key_id}/certificate.sha256` downloads a sha256 hash file.
 
-Agent endpoints (mTLS):
+Agent endpoints (mTLS client certificate; cert is issued during enrollment, token retained only for migration compatibility):
 - `GET /api/v1/agent/servers/{server_id}/ssh-ca` returns the CA public key for agent install.
 - `GET /api/v1/agent/servers/{server_id}/accounts` returns account + system username (no raw keys).
 

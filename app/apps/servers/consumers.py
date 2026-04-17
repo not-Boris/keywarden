@@ -346,7 +346,7 @@ def _generate_session_keypair(tempdir: str, user, principal: str) -> tuple[str, 
     with open(pubkey_path, "r", encoding="utf-8") as handle:
         public_key = handle.read().strip()
     cert_text = _sign_public_key(
-        ca_private_key=ca.private_key,
+        ca_private_key=ca.get_private_key(),
         ca_public_key=ca.public_key,
         public_key=public_key,
         identity=identity,
@@ -382,6 +382,11 @@ def _build_ssh_command(
     log_level: str = "ERROR",
     connect_timeout: int | None = None,
 ) -> list[str]:
+    strict_host_key_checking = str(
+        getattr(settings, "KEYWARDEN_SHELL_STRICT_HOST_KEY_CHECKING", "accept-new")
+    ).strip().lower()
+    if strict_host_key_checking not in {"yes", "accept-new"}:
+        strict_host_key_checking = "accept-new"
     command = [
         "ssh",
     ]
@@ -404,13 +409,9 @@ def _build_ssh_command(
             "-o",
             "PreferredAuthentications=publickey",
             "-o",
-            "UserKnownHostsFile=/dev/null",
+            f"StrictHostKeyChecking={strict_host_key_checking}",
             "-o",
-            "GlobalKnownHostsFile=/dev/null",
-            "-o",
-            "StrictHostKeyChecking=no",
-            "-o",
-            "VerifyHostKeyDNS=no",
+            "UpdateHostKeys=yes",
             "-o",
             f"LogLevel={log_level}",
         ]

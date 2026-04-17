@@ -108,7 +108,9 @@ func runOnce(ctx context.Context, apiClient *client.Client, cfg *config.Config) 
 func logAgentUnauthorizedHint(err error) {
 	var statusErr *client.HTTPStatusError
 	if errors.As(err, &statusErr) && statusErr.StatusCode == 401 {
-		log.Printf("agent auth failed (401): ensure agent_api_token matches the enrollment-issued token for this server (raw token only; no 'Bearer ' prefix)")
+		log.Printf(
+			"agent auth failed (401): runtime auth is mTLS-first; verify this agent is using the enrolled client cert/key, server_id matches enrollment, and traffic is routed through nginx /api/v1/agent/ so TLS client-cert headers are forwarded. Bearer agent_api_token is optional compatibility metadata, not the primary auth path.",
+		)
 	}
 }
 

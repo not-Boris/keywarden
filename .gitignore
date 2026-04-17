@@ -224,3 +224,7 @@ nginx/certs/*.pem
 *.pdf
 
 theme/__pycache__/*
+
+evidence/runs/
+app/.*
+app/scripts/node_modules

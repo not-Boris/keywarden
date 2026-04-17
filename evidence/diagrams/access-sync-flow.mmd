@@ -1,0 +1,19 @@
+sequenceDiagram
+  participant U as User
+  participant K as Keywarden
+  participant A as Agent
+  participant S as Server
+
+  U->>K: Upload SSH public key
+  K->>K: Issue SSH user certificate
+  U->>K: Request server access
+  Admin->>K: Approve access request
+  A->>K: Poll heartbeat/accounts/ssh-ca
+  K-->>A: Approved users + CA public key
+  A->>S: Enforce accounts + SSH CA trust
+  U->>S: SSH using key + certificate
+  K->>K: Revoke/expire access
+  A->>K: Next poll cycle
+  K-->>A: Updated account state
+  A->>S: Remove or lock account access
+

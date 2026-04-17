@@ -35,7 +35,7 @@ from apps.servers.models import (
     hostname_validator,
 )
 from apps.telemetry.models import TelemetryEvent
-from keywarden.api.security import AgentPrincipal, AgentTokenAuth, hash_agent_token
+from keywarden.api.security import AgentMTLSAuth, AgentPrincipal, hash_agent_token
 
 
 class AuthorizedKeyOut(Schema):
@@ -137,7 +137,7 @@ class AgentHeartbeatIn(Schema):
 
 def build_router() -> Router:
     router = Router()
-    agent_auth = AgentTokenAuth()
+    agent_auth = AgentMTLSAuth()
 
     @router.post("/enroll", response=AgentEnrollOut, auth=None)
     @csrf_exempt
@@ -215,7 +215,7 @@ def build_router() -> Router:
     def authorized_keys(request: HttpRequest, server_id: int):
         """Resolve the effective authorized_keys list for a server.
 
-        Auth: required (admin/operator via API).
+        Auth: required (admin-level API permission).
         Permissions: requires view access to servers and keys.
         Behavior: uses access request scopes + active SSH keys to produce
         the exact key list the agent should deploy to the server.
@@ -247,7 +247,7 @@ def build_router() -> Router:
     def account_access(request: HttpRequest, server_id: int):
         """List accounts that should exist on a server.
 
-        Auth: per-agent bearer token issued at enrollment.
+        Auth: per-agent mTLS certificate presented to nginx and validated server-side.
         Behavior: resolves active users with approved shell/users scopes.
         Rationale: drives agent-side account provisioning.
         """
@@ -270,7 +270,7 @@ def build_router() -> Router:
     def ssh_ca(request: HttpRequest, server_id: int):
         """Return the active SSH user CA public key for agents.
 
-        Auth: per-agent bearer token issued at enrollment.
+        Auth: per-agent mTLS certificate presented to nginx and validated server-side.
         """
         _require_agent_access(request, server_id)
         _ = _get_server_or_404(server_id)
@@ -284,7 +284,7 @@ def build_router() -> Router:
     def sync_report(request: HttpRequest, server_id: int, payload: SyncReportIn = Body(...)):
         """Record an agent sync report for a server.
 
-        Auth: per-agent bearer token issued at enrollment.
+        Auth: per-agent mTLS certificate presented to nginx and validated server-side.
         Behavior: stores a telemetry event with counts of applied/revoked keys.
         Rationale: provides an audit trail of enforcement actions without
         requiring full log ingestion for every sync cycle.
@@ -315,7 +315,7 @@ def build_router() -> Router:
     def ingest_logs(request: HttpRequest, server_id: int, payload: List[LogEventIn] = Body(...)):
         """Accept log batches from agents for audit collection.
 
-        Auth: per-agent bearer token issued at enrollment.
+        Auth: per-agent mTLS certificate presented to nginx and validated server-side.
         Behavior: accepts structured log events for later storage and indexing.
         Storage: events are persisted in the primary datastore and indexed per
         server for filtering in the server audit view.
@@ -359,7 +359,7 @@ def build_router() -> Router:
     def log_config(request: HttpRequest, server_id: int):
         """Return server log-source configuration consumed by the agent.
 
-        Auth: per-agent bearer token issued at enrollment.
+        Auth: per-agent mTLS certificate presented to nginx and validated server-side.
         Behavior: returns enabled journal/service/file log sources for this server.
         Default: when no sources are defined, an empty list is returned and
         the agent falls back to current-boot journald collection.
@@ -392,7 +392,7 @@ def build_router() -> Router:
     def heartbeat(request: HttpRequest, server_id: int, payload: AgentHeartbeatIn = Body(...)):
         """Update server host metadata (hostname/IPs) reported by the agent.
 
-        Auth: per-agent bearer token issued at enrollment.
+        Auth: per-agent mTLS certificate presented to nginx and validated server-side.
         Behavior: updates hostname/IPv4/IPv6 when they change (e.g., DHCP).
         Conflict: unique constraints are enforced; conflicts return 409.
         Rationale: keeps the server inventory accurate without manual edits.
@@ -449,9 +449,6 @@ def _require_agent_access(request: HttpRequest, server_id: int) -> None:
     principal = getattr(request, "auth", None)
     if not isinstance(principal, AgentPrincipal):
         raise HttpError(401, "Unauthorized")
-    if principal.server_id is None:
-        # Backward-compatibility path for legacy global token rollout.
-        return
     if int(principal.server_id) != int(server_id):
         raise HttpError(403, "Forbidden")
 
@@ -551,7 +548,7 @@ def _load_agent_ca() -> tuple[x509.Certificate, object, str]:
         raise HttpError(500, "Agent CA not configured")
     try:
         ca_cert = x509.load_pem_x509_certificate(ca.cert_pem.encode("utf-8"))
-        ca_key = serialization.load_pem_private_key(ca.key_pem.encode("utf-8"), password=None)
+        ca_key = serialization.load_pem_private_key(ca.get_key_pem().encode("utf-8"), password=None)
     except (ValueError, TypeError):
         raise HttpError(500, "Invalid agent CA material")
     return ca_cert, ca_key, ca.cert_pem

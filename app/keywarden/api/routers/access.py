@@ -172,9 +172,9 @@ def build_router() -> Router:
         Auth: required.
         Permissions: requires `access.change_accessrequest` on the object.
         Rules:
-        - Admin/operator (global change) can set status to approved/denied/revoked/cancelled and
-          update expires_at.
-        - Non-admin can only set status to cancelled, and only while pending.
+        - Users with global change permission can set status to
+          approved/denied/revoked/cancelled and update expires_at.
+        - Non-global editors can only set status to cancelled, and only while pending.
         Side effects: updates object permissions for server visibility when
         approvals or revocations occur.
         Rationale: this is the core approval/denial path for access control.

@@ -1,0 +1,19 @@
+flowchart TB
+  subgraph DockerCompose
+    Nginx[Nginx]
+    Gunicorn[Gunicorn Django]
+    Daphne[Daphne WebSocket]
+    Celery[Celery Worker/Beat]
+    Redis[Valkey/Redis]
+  end
+
+  Nginx --> Gunicorn
+  Nginx --> Daphne
+  Gunicorn --> PG[(Keywarden PostgreSQL)]
+  Celery --> PG
+  Gunicorn --> Redis
+  Celery --> Redis
+  Agent[Agent on Managed Host] --> Nginx
+  Browser[User/Admin Browser] --> Nginx
+  IdP[Authentik/OIDC] --> Nginx
+

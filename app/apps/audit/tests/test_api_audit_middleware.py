@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.http import HttpResponse
 from django.test import RequestFactory, TestCase
 
+from apps.audit.admin import AuditEventTypeAdminForm
 from apps.audit.matching import find_matching_event_type
 from apps.audit.middleware import ApiAuditLogMiddleware
 from apps.audit.models import AuditEventType, AuditLog
@@ -84,3 +85,58 @@ class AuditEventMatchingTests(TestCase):
         )
         self.assertIsNotNone(matched)
         self.assertEqual(matched.id, event_type.id)
+
+
+class AuditAdminFormTests(TestCase):
+    def test_clean_endpoints_text_normalizes_lines(self) -> None:
+        form = AuditEventTypeAdminForm(
+            data={
+                "key": "admin_form_test",
+                "title": "Admin Form Test",
+                "description": "",
+                "kind": AuditEventType.Kind.API,
+                "default_severity": AuditEventType.Severity.INFO,
+                "endpoints_text": " /api/v1/a \n\nGET /api/v1/b \n",
+                "ip_whitelist_enabled": False,
+                "ip_whitelist_text": "",
+                "ip_blacklist_enabled": False,
+                "ip_blacklist_text": "",
+            }
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["endpoints_text"], "/api/v1/a\nGET /api/v1/b")
+
+    def test_form_save_populates_endpoint_and_ip_lists(self) -> None:
+        form = AuditEventTypeAdminForm(
+            data={
+                "key": "admin_form_save",
+                "title": "Admin Form Save",
+                "description": "",
+                "kind": AuditEventType.Kind.API,
+                "default_severity": AuditEventType.Severity.WARNING,
+                "endpoints_text": "/api/v1/a\nPOST /api/v1/b",
+                "ip_whitelist_enabled": True,
+                "ip_whitelist_text": "10.0.0.1\n10.0.0.0/24",
+                "ip_blacklist_enabled": True,
+                "ip_blacklist_text": "203.0.113.10",
+            }
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        instance = form.save()
+        self.assertEqual(instance.endpoints, ["/api/v1/a", "POST /api/v1/b"])
+        self.assertEqual(instance.ip_whitelist, ["10.0.0.1", "10.0.0.0/24"])
+        self.assertEqual(instance.ip_blacklist, ["203.0.113.10"])
+
+    def test_form_initializes_text_fields_from_instance(self) -> None:
+        instance = AuditEventType.objects.create(
+            key="admin_form_init",
+            title="Admin Form Init",
+            kind=AuditEventType.Kind.WEBSOCKET,
+            endpoints=["/ws/servers/*/shell/"],
+            ip_whitelist=["10.0.0.1"],
+            ip_blacklist=["203.0.113.10"],
+        )
+        form = AuditEventTypeAdminForm(instance=instance)
+        self.assertEqual(form.fields["endpoints_text"].initial, "/ws/servers/*/shell/")
+        self.assertEqual(form.fields["ip_whitelist_text"].initial, "10.0.0.1")
+        self.assertEqual(form.fields["ip_blacklist_text"].initial, "203.0.113.10")

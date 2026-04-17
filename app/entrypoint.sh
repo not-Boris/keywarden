@@ -39,5 +39,9 @@ python manage.py ensure_admin
 # Ensure application log directory exists and is writable by the Django runtime user.
 mkdir -p /var/log/keywarden
 chown -R djangouser:djangouser /var/log/keywarden || true
+CA_KEY_DIR="${KEYWARDEN_CA_KEY_DIR:-/var/lib/keywarden/ca-keys}"
+mkdir -p "$CA_KEY_DIR"
+chmod 700 "$CA_KEY_DIR" || true
+chown -R djangouser:djangouser "$CA_KEY_DIR" || true
 
 exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf

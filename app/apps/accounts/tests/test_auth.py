@@ -13,8 +13,17 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from apps.accounts.forms import NativePasswordResetForm
-from apps.accounts.identity import build_unique_username, normalize_email
+from apps.accounts.identity import (
+    apply_optional_role_mapping,
+    build_unique_username,
+    claim_bool,
+    claim_text,
+    normalize_email,
+    parse_groups,
+    upsert_external_identity,
+)
 from apps.accounts.models import ExternalIdentity, NativeAccountSecurity
+from apps.core.rbac import ROLE_ADMIN, ROLE_USER, get_user_role, set_user_role
 from apps.accounts.social_auth import KeywardenSocialAccountAdapter
 
 
@@ -28,6 +37,20 @@ class IdentityHelpersTests(TestCase):
         generated = build_unique_username("alice", "alice2@example.com")
         self.assertNotEqual(generated, "alice")
         self.assertTrue(generated.startswith("alice"))
+
+    def test_parse_groups_supports_multiple_input_shapes(self):
+        self.assertEqual(parse_groups(None), set())
+        self.assertEqual(parse_groups("Admins, Dev Ops"), {"admins", "dev", "ops"})
+        self.assertEqual(parse_groups(["Team-A", " team-b "]), {"team-a", "team-b"})
+        self.assertEqual(parse_groups(123), {"123"})
+
+    def test_claim_helpers(self):
+        claims = {"name": " Alice ", "enabled": "YES", "flag": False}
+        self.assertEqual(claim_text(claims, "name"), "Alice")
+        self.assertEqual(claim_text(claims, "missing", "fallback"), "fallback")
+        self.assertTrue(claim_bool(claims, "enabled"))
+        self.assertFalse(claim_bool(claims, "flag", default=True))
+        self.assertTrue(claim_bool(claims, "missing", default=True))
 
 
 class ImmutableEmailTests(TestCase):
@@ -52,6 +75,119 @@ class ExternalIdentityTests(TestCase):
             email_at_link="charlie@example.com",
         )
         self.assertIn("corporate-sso", str(identity))
+
+    def test_upsert_external_identity_create_and_update(self):
+        User = get_user_model()
+        user = User.objects.create_user(username="oidc1", email="oidc1@example.com", password="pass12345")
+        identity = upsert_external_identity(
+            user=user,
+            provider_type=ExternalIdentity.ProviderType.OIDC,
+            provider_id="oidc",
+            subject="sub-1",
+            email="oidc1@example.com",
+            issuer="https://issuer.example.com",
+            details={"groups": ["admins"]},
+        )
+        self.assertEqual(identity.user_id, user.id)
+        self.assertEqual(identity.issuer, "https://issuer.example.com")
+        self.assertEqual(identity.email_at_link, "oidc1@example.com")
+
+        refreshed = upsert_external_identity(
+            user=user,
+            provider_type=ExternalIdentity.ProviderType.OIDC,
+            provider_id="oidc",
+            subject="sub-1",
+            email="oidc1@example.com",
+            issuer="https://issuer-v2.example.com",
+            details={"groups": ["users"]},
+        )
+        self.assertEqual(refreshed.id, identity.id)
+        self.assertEqual(refreshed.issuer, "https://issuer-v2.example.com")
+        self.assertEqual(refreshed.details, {"groups": ["users"]})
+
+    def test_upsert_external_identity_rejects_conflicts(self):
+        User = get_user_model()
+        user1 = User.objects.create_user(username="oidc2", email="oidc2@example.com", password="pass12345")
+        user2 = User.objects.create_user(username="oidc3", email="oidc3@example.com", password="pass12345")
+        upsert_external_identity(
+            user=user1,
+            provider_type=ExternalIdentity.ProviderType.OIDC,
+            provider_id="oidc",
+            subject="sub-shared",
+            email="oidc2@example.com",
+        )
+        with self.assertRaises(Exception):
+            upsert_external_identity(
+                user=user2,
+                provider_type=ExternalIdentity.ProviderType.OIDC,
+                provider_id="oidc",
+                subject="sub-shared",
+                email="oidc3@example.com",
+            )
+        with self.assertRaises(Exception):
+            upsert_external_identity(
+                user=user1,
+                provider_type=ExternalIdentity.ProviderType.OIDC,
+                provider_id="oidc",
+                subject="sub-shared",
+                email="different@example.com",
+            )
+
+
+class RoleMappingTests(TestCase):
+    def test_apply_optional_role_mapping_promotes_and_demotes(self):
+        User = get_user_model()
+        user = User.objects.create_user(username="role-map", email="role-map@example.com", password="pass12345")
+
+        promoted = apply_optional_role_mapping(
+            user=user,
+            groups={"platform-admins"},
+            enabled=True,
+            admin_groups={"platform-admins"},
+            demote_on_miss=False,
+        )
+        user.refresh_from_db()
+        self.assertEqual(promoted, ROLE_ADMIN)
+        self.assertEqual(get_user_role(user), ROLE_ADMIN)
+
+        demoted = apply_optional_role_mapping(
+            user=user,
+            groups={"non-admin"},
+            enabled=True,
+            admin_groups={"platform-admins"},
+            demote_on_miss=True,
+        )
+        user.refresh_from_db()
+        self.assertEqual(demoted, ROLE_USER)
+        self.assertEqual(get_user_role(user), ROLE_USER)
+
+    def test_apply_optional_role_mapping_noop_paths(self):
+        User = get_user_model()
+        user = User.objects.create_user(username="role-map2", email="role-map2@example.com", password="pass12345")
+        self.assertIsNone(
+            apply_optional_role_mapping(
+                user=user,
+                groups={"anything"},
+                enabled=False,
+                admin_groups={"platform-admins"},
+                demote_on_miss=True,
+            )
+        )
+        self.assertIsNone(
+            apply_optional_role_mapping(
+                user=user,
+                groups={"platform-admins"},
+                enabled=True,
+                admin_groups=set(),
+                demote_on_miss=True,
+            )
+        )
+
+    def test_set_user_role_invalid_raises(self):
+        User = get_user_model()
+        user = User.objects.create_user(username="role-map3", email="role-map3@example.com", password="pass12345")
+        with self.assertRaises(ValueError):
+            set_user_role(user, "invalid-role")
 
 
 class _DummySocialLogin:

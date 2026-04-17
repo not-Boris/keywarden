@@ -12,6 +12,8 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
+from apps.core.secret_files import looks_like_pem, read_secret_ref, write_secret_file
+
 
 def parse_public_key(public_key: str) -> tuple[str, str, str]:
     trimmed = (public_key or "").strip()
@@ -104,8 +106,20 @@ class SSHCertificateAuthority(models.Model):
         self.is_active = False
         self.revoked_at = timezone.now()
 
+    def get_private_key(self) -> str:
+        file_payload = read_secret_ref(self.private_key, label="User CA private key")
+        if file_payload:
+            return file_payload
+        inline_payload = (self.private_key or "").strip()
+        if looks_like_pem(inline_payload):
+            self.private_key = write_secret_file("user-ca-key", inline_payload)
+            if self.pk:
+                self.save(update_fields=["private_key"])
+            return inline_payload
+        return ""
+
     def ensure_material(self) -> None:
-        if self.public_key and self.private_key:
+        if self.public_key and self.get_private_key():
             if not self.fingerprint:
                 _, _, fingerprint = parse_public_key(self.public_key)
                 self.fingerprint = fingerprint
@@ -130,7 +144,7 @@ class SSHCertificateAuthority(models.Model):
             except subprocess.CalledProcessError as exc:
                 raise RuntimeError(f"ssh-keygen failed: {exc.stderr.decode('utf-8', 'ignore')}") from exc
             with open(key_path, "r", encoding="utf-8") as handle:
-                self.private_key = handle.read()
+                self.private_key = write_secret_file("user-ca-key", handle.read())
             with open(key_path + ".pub", "r", encoding="utf-8") as handle:
                 self.public_key = handle.read().strip()
         _, _, fingerprint = parse_public_key(self.public_key)

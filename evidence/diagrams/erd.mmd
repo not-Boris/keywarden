@@ -1,0 +1,11 @@
+erDiagram
+  USER ||--o{ SSHKEY : owns
+  SSHKEY ||--o{ SSHCERTIFICATE : signs
+  USER ||--o{ ACCESSREQUEST : requests
+  SERVER ||--o{ ACCESSREQUEST : targets
+  SERVER ||--o{ SERVERACCOUNT : contains
+  USER ||--o{ SERVERACCOUNT : maps_to
+  SERVER ||--o{ SERVERAUDITLOG : ingests
+  SERVER ||--o{ TELEMETRYEVENT : emits
+  USER ||--o{ AUDITLOG : performs
+

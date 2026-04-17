@@ -23,6 +23,7 @@ services:
       - ./nginx/certs:/etc/nginx/certs
       - ./nginx/logs:/var/log/nginx
       - ./app/logs:/var/log/keywarden
+      - ./data/ca-keys:/var/lib/keywarden/ca-keys
     ports:
       - "443:443"
     depends_on:
