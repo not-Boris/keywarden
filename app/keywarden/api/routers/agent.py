@@ -35,7 +35,7 @@ from apps.servers.models import (
     hostname_validator,
 )
 from apps.telemetry.models import TelemetryEvent
-from keywarden.api.security import AgentMTLSAuth, AgentPrincipal, hash_agent_token
+from keywarden.api.security import AgentPrincipal, AgentRuntimeAuth, hash_agent_token
 
 
 class AuthorizedKeyOut(Schema):
@@ -80,6 +80,7 @@ class SyncReportOut(Schema):
 class AgentEnrollIn(Schema):
     token: str
     csr_pem: str
+    server_id: Optional[str] = None
     host: Optional[str] = None
     ipv4: Optional[str] = None
     ipv6: Optional[str] = None
@@ -137,7 +138,7 @@ class AgentHeartbeatIn(Schema):
 
 def build_router() -> Router:
     router = Router()
-    agent_auth = AgentMTLSAuth()
+    agent_auth = AgentRuntimeAuth()
 
     @router.post("/enroll", response=AgentEnrollOut, auth=None)
     @csrf_exempt
@@ -148,7 +149,8 @@ def build_router() -> Router:
         enrollment completes.
         Inputs: enrollment token + CSR from the agent, optional host/IP hints.
         Behavior:
-        - Creates a Server record (agent is the source of truth for host/IP).
+        - Creates a Server record (agent is the source of truth for host/IP), or
+          rotates credentials in-place when `server_id` is provided.
         - Marks the token as used (single-use).
         - Signs the CSR with the active Agent CA and returns client cert + CA.
         Rationale: this is the only supported server onboarding flow. If this
@@ -175,16 +177,34 @@ def build_router() -> Router:
                 hostname = None
         ipv4 = _normalize_ip(payload.ipv4, 4)
         ipv6 = _normalize_ip(payload.ipv6, 6)
+        requested_server_id = _parse_requested_server_id(payload.server_id)
 
         csr = _load_csr((payload.csr_pem or "").strip())
         try:
             with transaction.atomic():
-                server = Server.objects.create(
-                    display_name=display_name,
-                    hostname=hostname,
-                    ipv4=ipv4,
-                    ipv6=ipv6,
-                )
+                if requested_server_id is None:
+                    server = Server.objects.create(
+                        display_name=display_name,
+                        hostname=hostname,
+                        ipv4=ipv4,
+                        ipv6=ipv6,
+                    )
+                else:
+                    try:
+                        server = Server.objects.select_for_update().get(id=requested_server_id)
+                    except Server.DoesNotExist:
+                        raise HttpError(404, "Server not found for re-enrollment")
+
+                    # Optional host/IP updates are best-effort metadata refresh.
+                    if host and (server.display_name or "").strip().lower() in {"", "server"}:
+                        server.display_name = display_name
+                    if hostname:
+                        server.hostname = hostname
+                    if ipv4:
+                        server.ipv4 = ipv4
+                    if ipv6:
+                        server.ipv6 = ipv6
+
                 token.mark_used(server)
                 token.save(update_fields=["used_at", "server"])
                 cert_pem, ca_pem, fingerprint, serial = _issue_client_cert(csr, host, server.id)
@@ -193,16 +213,11 @@ def build_router() -> Router:
                 server.agent_cert_fingerprint = fingerprint
                 server.agent_cert_serial = serial
                 server.agent_api_token_hash = hash_agent_token(agent_api_token)
-                server.save(
-                    update_fields=[
-                        "agent_enrolled_at",
-                        "agent_cert_fingerprint",
-                        "agent_cert_serial",
-                        "agent_api_token_hash",
-                    ]
-                )
+                server.save()
         except IntegrityError:
-            raise HttpError(409, "Server already enrolled")
+            if requested_server_id is None:
+                raise HttpError(409, "Server already enrolled")
+            raise HttpError(409, "Server address already in use")
 
         return AgentEnrollOut(
             server_id=str(server.id),
@@ -440,6 +455,19 @@ def _get_server_or_404(server_id: int) -> Server:
         raise HttpError(404, "Server not found")
 
 
+def _parse_requested_server_id(value: Optional[str]) -> Optional[int]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        server_id = int(text)
+    except (TypeError, ValueError):
+        raise HttpError(422, "server_id must be numeric")
+    if server_id <= 0:
+        raise HttpError(422, "server_id must be positive")
+    return server_id
+
+
 def _issue_agent_api_token() -> str:
     # Opaque, high-entropy token; only SHA-256 hash is stored server-side.
     return secrets.token_urlsafe(48)
@@ -449,6 +477,9 @@ def _require_agent_access(request: HttpRequest, server_id: int) -> None:
     principal = getattr(request, "auth", None)
     if not isinstance(principal, AgentPrincipal):
         raise HttpError(401, "Unauthorized")
+    if principal.server_id is None:
+        # Global token compatibility mode: trust caller after auth success.
+        return
     if int(principal.server_id) != int(server_id):
         raise HttpError(403, "Forbidden")
 

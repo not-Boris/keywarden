@@ -455,6 +455,57 @@ class SecurityAndCertificateHelperTests(TestCase):
         )
         self.assertIsNone(auth.authenticate(bad_fingerprint))
 
+    def test_agent_runtime_auth_falls_back_to_server_token_without_mtls_headers(self):
+        server_token = "server-token-123"
+        server = Server.objects.create(
+            display_name="token-fallback-1",
+            hostname="token-fallback-1.example.test",
+            agent_api_token_hash=api_security.hash_agent_token(server_token),
+        )
+        request = SimpleNamespace(
+            META={"HTTP_AUTHORIZATION": f"Bearer {server_token}"},
+            path="/api/v1/agent/servers/1/log-config",
+        )
+        auth = api_security.AgentRuntimeAuth()
+
+        principal = auth.authenticate(request)
+
+        self.assertIsNotNone(principal)
+        self.assertEqual(principal.mode, "server-token")
+        self.assertEqual(principal.server_id, server.id)
+
+    @override_settings(KEYWARDEN_AGENT_API_TOKEN="global-token-123")
+    def test_agent_runtime_auth_accepts_global_token_without_mtls_headers(self):
+        request = SimpleNamespace(
+            META={"HTTP_AUTHORIZATION": "Bearer global-token-123"},
+            path="/api/v1/agent/servers/1/log-config",
+        )
+        auth = api_security.AgentRuntimeAuth()
+
+        principal = auth.authenticate(request)
+
+        self.assertIsNotNone(principal)
+        self.assertEqual(principal.mode, "global-token")
+        self.assertIsNone(principal.server_id)
+
+    @override_settings(KEYWARDEN_AGENT_RUNTIME_ALLOW_TOKEN_FALLBACK=False)
+    def test_agent_runtime_auth_can_disable_token_fallback(self):
+        server_token = "server-token-strict-123"
+        Server.objects.create(
+            display_name="token-fallback-off-1",
+            hostname="token-fallback-off-1.example.test",
+            agent_api_token_hash=api_security.hash_agent_token(server_token),
+        )
+        request = SimpleNamespace(
+            META={"HTTP_AUTHORIZATION": f"Bearer {server_token}"},
+            path="/api/v1/agent/servers/1/log-config",
+        )
+        auth = api_security.AgentRuntimeAuth()
+
+        principal = auth.authenticate(request)
+
+        self.assertIsNone(principal)
+
     def test_sanitize_username_and_render_system_username(self):
         self.assertEqual(sanitize_username("Alice Smith"), "alice_smith")
         self.assertEqual(sanitize_username("  "), "")

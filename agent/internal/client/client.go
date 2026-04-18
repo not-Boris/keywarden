@@ -52,6 +52,7 @@ func New(cfg *config.Config) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load client cert: %w", err)
 	}
+	clientCert := cert
 	caPool, err := x509.SystemCertPool()
 	if err != nil || caPool == nil {
 		caPool = x509.NewCertPool()
@@ -70,6 +71,12 @@ func New(cfg *config.Config) (*Client, error) {
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      caPool,
 		MinVersion:   tls.VersionTLS12,
+		// Always return the enrolled client certificate when the server
+		// requests mTLS credentials. This avoids edge cases where automatic
+		// certificate selection declines to send a cert.
+		GetClientCertificate: func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			return &clientCert, nil
+		},
 	}
 
 	transport := &http.Transport{
@@ -122,12 +129,13 @@ func (c *Client) setAuth(req *http.Request) {
 }
 
 type EnrollRequest struct {
-	Token   string `json:"token"`
-	CSRPEM  string `json:"csr_pem"`
-	Host    string `json:"host"`
-	IPv4    string `json:"ipv4,omitempty"`
-	IPv6    string `json:"ipv6,omitempty"`
-	AgentID string `json:"agent_id,omitempty"`
+	Token    string `json:"token"`
+	CSRPEM   string `json:"csr_pem"`
+	Host     string `json:"host"`
+	IPv4     string `json:"ipv4,omitempty"`
+	IPv6     string `json:"ipv6,omitempty"`
+	ServerID string `json:"server_id,omitempty"`
+	AgentID  string `json:"agent_id,omitempty"`
 }
 
 type EnrollResponse struct {

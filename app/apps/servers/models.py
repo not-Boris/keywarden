@@ -139,7 +139,15 @@ class AgentCertificateAuthority(models.Model):
         self.revoked_at = timezone.now()
 
     def get_key_pem(self) -> str:
-        file_payload = read_secret_ref(self.key_pem, label="Agent CA private key")
+        try:
+            file_payload = read_secret_ref(self.key_pem, label="Agent CA private key")
+        except RuntimeError as exc:
+            # Recover gracefully when a secret-file reference points to a
+            # deleted key file (for example after volume resets).
+            if "file missing:" in str(exc):
+                file_payload = ""
+            else:
+                raise
         if file_payload:
             return file_payload
         inline_payload = (self.key_pem or "").strip()

@@ -32,9 +32,12 @@ var lastNoEventsNotice time.Time
 
 func main() {
 	configPath := flag.String("config", config.DefaultConfigPath, "Path to agent config JSON")
+	flag.StringVar(configPath, "c", config.DefaultConfigPath, "Path to agent config JSON (shorthand)")
 	serverURL := flag.String("server-url", "", "Keywarden server URL (first boot)")
 	enrollToken := flag.String("enroll-token", "", "Enrollment token (first boot)")
+	flag.StringVar(enrollToken, "t", "", "Enrollment token (first boot, shorthand)")
 	forceEnroll := flag.Bool("force-enroll", false, "Force re-enrollment even if already bootstrapped")
+	flag.BoolVar(forceEnroll, "f", false, "Force re-enrollment even if already bootstrapped (shorthand)")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
 
@@ -236,17 +239,21 @@ func bootstrapIfNeeded(cfg *config.Config, configPath string, enrollToken string
 	previousServerID := strings.TrimSpace(cfg.ServerID)
 	if !forceEnroll && cfg.ServerID != "" && fileExists(cfg.ClientCertPath()) && fileExists(cfg.CACertPath()) {
 		if strings.TrimSpace(enrollToken) != "" {
-			log.Printf("enrollment token provided but bootstrap is already complete; skipping enrollment (use -force-enroll to rotate identity)")
+			log.Printf("enrollment token provided but bootstrap is already complete; skipping enrollment (use -f/--force-enroll to rotate identity)")
 		}
 		return nil
 	}
 	if enrollToken == "" {
-		return fmt.Errorf("missing enrollment token; set KEYWARDEN_ENROLL_TOKEN or -enroll-token")
+		return fmt.Errorf("missing enrollment token; set KEYWARDEN_ENROLL_TOKEN or -t/--enroll-token")
 	}
+	rotateServerID := ""
 	if forceEnroll {
-		log.Printf("force re-enrollment requested; replacing existing server identity")
-		cfg.ServerID = ""
-		cfg.AgentAPIToken = ""
+		rotateServerID = previousServerID
+		if rotateServerID != "" {
+			log.Printf("force re-enrollment requested; rotating certificate in-place for server_id=%s", rotateServerID)
+		} else {
+			log.Printf("force re-enrollment requested; no existing server_id, enrolling as new server identity")
+		}
 	}
 	keyPath := cfg.ClientKeyPath()
 	if !fileExists(keyPath) {
@@ -261,14 +268,22 @@ func bootstrapIfNeeded(cfg *config.Config, configPath string, enrollToken string
 	info := host.Detect()
 	hostname := info.Hostname
 	resp, err := client.Enroll(context.Background(), cfg.ServerURL, client.EnrollRequest{
-		Token:  enrollToken,
-		CSRPEM: csrPEM,
-		Host:   hostname,
-		IPv4:   info.IPv4,
-		IPv6:   info.IPv6,
+		Token:    enrollToken,
+		CSRPEM:   csrPEM,
+		Host:     hostname,
+		IPv4:     info.IPv4,
+		IPv6:     info.IPv6,
+		ServerID: rotateServerID,
 	})
 	if err != nil {
 		return err
+	}
+	if rotateServerID != "" && strings.TrimSpace(resp.ServerID) != rotateServerID {
+		return fmt.Errorf(
+			"re-enrollment returned unexpected server_id=%s (expected %s)",
+			strings.TrimSpace(resp.ServerID),
+			rotateServerID,
+		)
 	}
 	if err := os.WriteFile(cfg.ClientCertPath(), []byte(resp.ClientCert), 0o600); err != nil {
 		return err

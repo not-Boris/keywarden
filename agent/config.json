@@ -1,7 +1,6 @@
 {
-  "server_url": "https://keywarden.dev.ntbx.io/api/v1",
-  "server_id": "6",
-  "agent_api_token": "HV8MnbysmINShu9wkXzzNrQE5NyRlPJHfP2aU6SX4HERrlac8EQpoMEu02FX1TYv",
+  "server_url": "https://agent.keywarden.dev.ntbx.io/api/v1",
+  "server_id": "13",
   "sync_interval_seconds": 5,
   "log_batch_size": 2000,
   "state_dir": "/var/lib/keywarden-agent",

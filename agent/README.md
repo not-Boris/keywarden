@@ -12,11 +12,19 @@ go build -o keywarden-agent ./cmd/keywarden-agent
 
 ## Run
 
-```
-./keywarden-agent -config /etc/keywarden/agent.json -server-url https://keywarden.example.com -enroll-token <token>
+``` 
+./keywarden-agent --config /etc/keywarden/agent.json --server-url https://keywarden.example.com --enroll-token <token>
 ```
 
-To rotate/re-enroll an existing agent identity, add `-force-enroll` with a fresh token.
+Short aliases are also supported:
+
+```bash
+./keywarden-agent -c /etc/keywarden/agent.json -t <token> -f
+```
+
+To rotate/re-enroll an existing agent identity in place, use `-f/--force-enroll` with a fresh token.
+When `server_id` already exists in config, force-enroll rotates the client certificate for that server
+instead of creating a new server record.
 
 You can also pass `KEYWARDEN_SERVER_URL` and `KEYWARDEN_ENROLL_TOKEN` as environment variables.
 

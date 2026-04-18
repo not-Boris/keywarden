@@ -90,6 +90,44 @@ class AgentTokenAuth(HttpBearer):
         return None
 
 
+class AgentRuntimeAuth:
+    """
+    Runtime agent auth: prefer mTLS, with bearer-token compatibility fallback.
+
+    Behavior:
+    - If a mTLS context appears present, attempt mTLS validation first.
+    - If mTLS is absent/invalid, fall back to enrollment-issued bearer token.
+    """
+
+    def __init__(self) -> None:
+        self._mtls = AgentMTLSAuth()
+        self._token = AgentTokenAuth()
+
+    def __call__(self, request: HttpRequest) -> Optional["AgentPrincipal"]:
+        return self.authenticate(request)
+
+    def authenticate(self, request: HttpRequest) -> Optional["AgentPrincipal"]:
+        bearer = _extract_bearer_token_from_request(request)
+        allow_fallback = bool(
+            getattr(settings, "KEYWARDEN_AGENT_RUNTIME_ALLOW_TOKEN_FALLBACK", True)
+        )
+
+        if not allow_fallback:
+            return self._mtls.authenticate(request)
+
+        # Fast path: no mTLS headers at all but bearer token is present.
+        # This avoids noisy mTLS "missing verify" rejection logs on every poll.
+        if bearer and not _request_has_mtls_context(request):
+            return self._token.authenticate(request, bearer)
+
+        principal = self._mtls.authenticate(request)
+        if principal:
+            return principal
+        if bearer:
+            return self._token.authenticate(request, bearer)
+        return None
+
+
 class AgentMTLSAuth:
     """
     Auth via mTLS client certificate details forwarded by nginx.
@@ -181,6 +219,26 @@ def _normalize_agent_token(value: object) -> str:
     if token.lower().startswith("bearer "):
         token = token[7:].strip()
     return token
+
+
+def _extract_bearer_token_from_request(request: HttpRequest) -> str:
+    authz = str(request.META.get("HTTP_AUTHORIZATION", "")).strip()
+    if not authz:
+        return ""
+    parts = authz.split(None, 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return ""
+    return _normalize_agent_token(parts[1])
+
+
+def _request_has_mtls_context(request: HttpRequest) -> bool:
+    verify = str(request.META.get(AgentMTLSAuth.verify_header, "")).strip().upper()
+    cert_payload = str(request.META.get(AgentMTLSAuth.cert_header, "")).strip()
+    if cert_payload:
+        return True
+    if verify and verify != "NONE":
+        return True
+    return False
 
 
 def hash_agent_token(value: str) -> str:

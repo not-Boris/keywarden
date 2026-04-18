@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.conf import settings
 from django.utils.html import format_html
 
 try:
@@ -14,7 +15,16 @@ except ImportError:  # Fallback for older Unfold builds without guardian admin s
     class GuardedModelAdmin(GuardianGuardedModelAdmin, UnfoldModelAdmin):
         pass
 
-from .models import AgentCertificateAuthority, EnrollmentToken, Server, ServerAuditLog, ServerLogSource
+from apps.access.models import AccessRequest
+
+from .models import (
+    AgentCertificateAuthority,
+    EnrollmentToken,
+    Server,
+    ServerAccount,
+    ServerAuditLog,
+    ServerLogSource,
+)
 
 
 class ServerLogSourceInline(admin.TabularInline):
@@ -53,6 +63,64 @@ class ServerAdmin(GuardedModelAdmin):
         "updated_at",
     )
     inlines = (ServerLogSourceInline,)
+
+    def _large_delete_preview_threshold(self) -> int:
+        value = getattr(settings, "KEYWARDEN_ADMIN_DELETE_PREVIEW_MAX_ITEMS", 5000)
+        try:
+            threshold = int(value)
+        except (TypeError, ValueError):
+            threshold = 5000
+        return max(threshold, 1)
+
+    def _related_delete_counts(self, server_ids: list[int]) -> dict[str, int]:
+        return {
+            ServerAuditLog._meta.verbose_name_plural: ServerAuditLog.objects.filter(server_id__in=server_ids).count(),
+            ServerAccount._meta.verbose_name_plural: ServerAccount.objects.filter(server_id__in=server_ids).count(),
+            ServerLogSource._meta.verbose_name_plural: ServerLogSource.objects.filter(server_id__in=server_ids).count(),
+            AccessRequest._meta.verbose_name_plural: AccessRequest.objects.filter(server_id__in=server_ids).count(),
+        }
+
+    def get_deleted_objects(self, objs, request):
+        # Django's default nested object preview scales poorly for very large
+        # cascades (for example, many ServerAuditLog rows) and can cause
+        # worker timeouts/OOM during delete confirmation rendering.
+        if not request.user.is_superuser:
+            return super().get_deleted_objects(objs, request)
+
+        server_ids = list(objs.values_list("id", flat=True))
+        if not server_ids:
+            return super().get_deleted_objects(objs, request)
+
+        related_counts = self._related_delete_counts(server_ids)
+        total_related = sum(related_counts.values())
+        if total_related < self._large_delete_preview_threshold():
+            return super().get_deleted_objects(objs, request)
+
+        model_count = {
+            self.model._meta.verbose_name_plural: len(server_ids),
+        }
+        deleted_objects = [f"{len(server_ids)} {self.model._meta.verbose_name_plural}"]
+        for label, count in related_counts.items():
+            if count:
+                model_count[label] = count
+                deleted_objects.append(f"{count} {label}")
+        deleted_objects.append(
+            "Large cascade detected. Related objects are summarized here to keep delete confirmation responsive."
+        )
+        return deleted_objects, model_count, set(), []
+
+    def _purge_server_audit_logs(self, server_ids: list[int]) -> None:
+        if not server_ids:
+            return
+        ServerAuditLog.objects.filter(server_id__in=server_ids).delete()
+
+    def delete_model(self, request, obj) -> None:
+        self._purge_server_audit_logs([obj.id])
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset) -> None:
+        self._purge_server_audit_logs(list(queryset.values_list("id", flat=True)))
+        super().delete_queryset(request, queryset)
 
     def avatar(self, obj: Server):
         if obj.image_url:

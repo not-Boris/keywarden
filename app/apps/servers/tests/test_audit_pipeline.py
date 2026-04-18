@@ -21,7 +21,7 @@ from ninja.errors import HttpError
 from apps.access.models import AccessRequest
 from apps.keys.models import SSHKey
 from apps.keys.models import SSHCertificate, SSHCertificateAuthority, parse_public_key
-from apps.servers.models import AgentCertificateAuthority, Server, ServerAuditLog, ServerLogSource
+from apps.servers.models import AgentCertificateAuthority, EnrollmentToken, Server, ServerAuditLog, ServerLogSource
 from keywarden.api.routers import agent as agent_router
 
 
@@ -472,6 +472,10 @@ class AgentRouterHelpersTests(TestCase):
             SimpleNamespace(auth=agent_router.AgentPrincipal(server_id=self.server.id, mode="mtls")),
             self.server.id,
         )
+        agent_router._require_agent_access(
+            SimpleNamespace(auth=agent_router.AgentPrincipal(server_id=None, mode="global-token")),
+            self.server.id,
+        )
         self.assertNotEqual(agent_router._issue_agent_api_token(), agent_router._issue_agent_api_token())
 
     def test_server_lookup_key_map_and_account_sync_helpers(self) -> None:
@@ -542,6 +546,65 @@ class AgentRouterHelpersTests(TestCase):
         self.assertEqual(returned_ca_pem, ca_pem)
         self.assertTrue(fingerprint)
         self.assertTrue(serial)
+
+    def test_enroll_agent_rotates_existing_server_when_server_id_is_provided(self) -> None:
+        ca_cert, _ca_key, ca_pem, key_pem = self._build_ca_material()
+        agent_router.AgentCertificateAuthority.objects.create(
+            name="Enroll CA",
+            cert_pem=ca_pem,
+            key_pem=key_pem,
+            is_active=True,
+        )
+        token = EnrollmentToken.objects.create(token="rotate-token")
+        original_server_count = Server.objects.count()
+        self.server.agent_cert_fingerprint = "deadbeef"
+        self.server.agent_cert_serial = "1"
+        self.server.save(update_fields=["agent_cert_fingerprint", "agent_cert_serial"])
+
+        csr = self._build_csr("rotate-agent.example.test")
+        payload = {
+            "token": token.token,
+            "csr_pem": csr.public_bytes(serialization.Encoding.PEM).decode("utf-8"),
+            "server_id": str(self.server.id),
+            "host": self.server.hostname,
+        }
+        response = self.client.post(
+            "/api/v1/agent/enroll",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["server_id"], str(self.server.id))
+        self.assertIn("BEGIN CERTIFICATE", body["client_cert_pem"])
+        self.assertIn("BEGIN CERTIFICATE", body["ca_cert_pem"])
+        self.assertTrue(body["agent_api_token"])
+        self.assertEqual(Server.objects.count(), original_server_count)
+
+        self.server.refresh_from_db()
+        self.assertNotEqual(self.server.agent_cert_fingerprint, "deadbeef")
+        self.assertNotEqual(self.server.agent_cert_serial, "1")
+        self.assertIsNotNone(self.server.agent_enrolled_at)
+        token.refresh_from_db()
+        self.assertEqual(token.server_id, self.server.id)
+        self.assertIsNotNone(token.used_at)
+
+    def test_enroll_agent_rejects_invalid_server_id(self) -> None:
+        token = EnrollmentToken.objects.create(token="rotate-token-bad")
+        csr = self._build_csr("rotate-agent.example.test")
+        payload = {
+            "token": token.token,
+            "csr_pem": csr.public_bytes(serialization.Encoding.PEM).decode("utf-8"),
+            "server_id": "not-a-number",
+        }
+        response = self.client.post(
+            "/api/v1/agent/enroll",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("server_id must be numeric", response.content.decode("utf-8"))
 
 
 class KeysModelHelpersTests(TestCase):
