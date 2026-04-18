@@ -455,6 +455,7 @@ class SecurityAndCertificateHelperTests(TestCase):
         )
         self.assertIsNone(auth.authenticate(bad_fingerprint))
 
+    @override_settings(KEYWARDEN_AGENT_RUNTIME_ALLOW_TOKEN_FALLBACK=True)
     def test_agent_runtime_auth_falls_back_to_server_token_without_mtls_headers(self):
         server_token = "server-token-123"
         server = Server.objects.create(
@@ -474,7 +475,10 @@ class SecurityAndCertificateHelperTests(TestCase):
         self.assertEqual(principal.mode, "server-token")
         self.assertEqual(principal.server_id, server.id)
 
-    @override_settings(KEYWARDEN_AGENT_API_TOKEN="global-token-123")
+    @override_settings(
+        KEYWARDEN_AGENT_API_TOKEN="global-token-123",
+        KEYWARDEN_AGENT_RUNTIME_ALLOW_TOKEN_FALLBACK=True,
+    )
     def test_agent_runtime_auth_accepts_global_token_without_mtls_headers(self):
         request = SimpleNamespace(
             META={"HTTP_AUTHORIZATION": "Bearer global-token-123"},
