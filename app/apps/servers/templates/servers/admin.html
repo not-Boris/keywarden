@@ -12,88 +12,327 @@
     </div>
 
     <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <article class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <a
+        href="{% url 'servers:admin_dashboard' %}?view=users"
+        class="rounded-2xl border p-5 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 {% if active_view == 'users' %}border-blue-300 bg-blue-50{% else %}border-gray-200 bg-white{% endif %}"
+      >
         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Users</p>
         <p class="mt-2 text-2xl font-semibold text-gray-900">{{ summary.users }}</p>
-      </article>
-      <article class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      </a>
+      <a
+        href="{% url 'servers:admin_dashboard' %}?view=servers"
+        class="rounded-2xl border p-5 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 {% if active_view == 'servers' %}border-blue-300 bg-blue-50{% else %}border-gray-200 bg-white{% endif %}"
+      >
         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Servers</p>
         <p class="mt-2 text-2xl font-semibold text-gray-900">{{ summary.servers }}</p>
-      </article>
-      <article class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      </a>
+      <a
+        href="{% url 'servers:admin_dashboard' %}?view=pending"
+        class="rounded-2xl border p-5 shadow-sm transition hover:border-amber-300 hover:bg-amber-50 {% if active_view == 'pending' %}border-amber-300 bg-amber-50{% else %}border-gray-200 bg-white{% endif %}"
+      >
         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Pending Requests</p>
         <p class="mt-2 text-2xl font-semibold text-amber-700">{{ summary.pending_requests }}</p>
-      </article>
-      <article class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      </a>
+      <a
+        href="{% url 'servers:admin_dashboard' %}?view=grants"
+        class="rounded-2xl border p-5 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 {% if active_view == 'grants' %}border-emerald-300 bg-emerald-50{% else %}border-gray-200 bg-white{% endif %}"
+      >
         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Active Grants</p>
         <p class="mt-2 text-2xl font-semibold text-emerald-700">{{ summary.active_grants }}</p>
-      </article>
+      </a>
     </section>
 
-    <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-4">
-        <div>
-          <h2 class="text-lg font-semibold text-gray-900">Access request queue</h2>
-          <p class="mt-1 text-sm text-gray-500">Review and decide pending access requests.</p>
+    {% if active_view == "users" %}
+      <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-4">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Users</h2>
+            <p class="mt-1 text-sm text-gray-500">Manage users, review logins, and jump to user-filtered grants.</p>
+          </div>
+          <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
+            {{ users|length }} users
+          </span>
         </div>
-        <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
-          {{ pending_access_requests|length }} pending
-        </span>
-      </div>
-      {% if pending_access_requests %}
-        <div class="mt-4 overflow-x-auto rounded-xl border border-gray-200">
-          <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th class="px-3 py-2 font-semibold">Requester</th>
-                <th class="px-3 py-2 font-semibold">Server</th>
-                <th class="px-3 py-2 font-semibold">Requested scopes</th>
-                <th class="px-3 py-2 font-semibold">Requested at</th>
-                <th class="px-3 py-2 font-semibold text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 text-gray-700">
-              {% for req in pending_access_requests %}
+        {% if users %}
+          <div class="mt-4 overflow-x-auto rounded-xl border border-gray-200">
+            <table class="min-w-full divide-y divide-gray-200 text-sm" data-sort-table>
+              <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
-                  <td class="px-3 py-2">{{ req.requester.username }}</td>
-                  <td class="px-3 py-2">
-                    <a href="{% url 'servers:server_admin' req.server.id %}" class="font-medium text-blue-700 hover:underline">
-                      {{ req.server.display_name }}
-                    </a>
-                  </td>
-                  <td class="px-3 py-2">
-                    <div class="flex flex-wrap gap-1">
-                      {% if req.request_shell %}<span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Shell</span>{% endif %}
-                      {% if req.request_logs %}<span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Logs</span>{% endif %}
-                      {% if req.request_users %}<span class="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Users</span>{% endif %}
-                    </div>
-                  </td>
-                  <td class="px-3 py-2">{{ req.requested_at|date:"M j, Y H:i" }}</td>
-                  <td class="px-3 py-2 text-right">
-                    <div class="inline-flex gap-2">
-                      <form method="post" action="{% url 'servers:decide_access_request' req.id %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="approve">
-                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                        <button type="submit" class="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Approve</button>
-                      </form>
-                      <form method="post" action="{% url 'servers:decide_access_request' req.id %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="deny">
-                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                        <button type="submit" class="inline-flex items-center rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">Deny</button>
-                      </form>
-                    </div>
-                  </td>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="text">User <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="date">Last login <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="number">Grants applied <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold text-right">Actions</th>
                 </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+              </thead>
+              <tbody class="divide-y divide-gray-100 text-gray-700">
+                {% for row in users %}
+                  <tr class="{% if row.has_pending_erasure_request %}bg-amber-50{% endif %}">
+                    <td class="px-3 py-2" data-sort-value="{{ row.user.username|lower }}">
+                      <div class="flex items-center gap-2">
+                        <span class="font-medium text-gray-900">{{ row.user.username }}</span>
+                        {% if row.has_pending_erasure_request %}
+                          <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">GDPR request</span>
+                        {% endif %}
+                      </div>
+                    </td>
+                    <td class="px-3 py-2" data-sort-value="{% if row.user.last_login %}{{ row.user.last_login|date:'YmdHis' }}{% else %}0{% endif %}">
+                      {% if row.user.last_login %}
+                        {{ row.user.last_login|date:"M j, Y H:i" }}
+                      {% else %}
+                        <span class="text-gray-500">Never</span>
+                      {% endif %}
+                    </td>
+                    <td class="px-3 py-2" data-sort-value="{{ row.active_grants_count }}">
+                      <a
+                        href="{% url 'servers:admin_dashboard' %}?view=grants&grant_user={{ row.user.id }}"
+                        class="font-medium text-blue-700 hover:underline"
+                        title="{{ row.active_grants_tooltip }}"
+                      >
+                        {{ row.active_grants_count }} active
+                      </a>
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                      <div class="inline-flex flex-wrap justify-end gap-2">
+                        <form method="post" action="{% url 'servers:admin_send_password_reset' row.user.id %}">
+                          {% csrf_token %}
+                          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                          <button type="submit" class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800">Send reset email</button>
+                        </form>
+                        {% if row.user.id != request.user.id %}
+                          <form method="post" action="{% url 'servers:admin_delete_user' row.user.id %}" onsubmit="return window.confirm('Delete user {{ row.user.username|escapejs }}? This cannot be undone.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            <button
+                              type="submit"
+                              class="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-semibold text-white {% if row.has_pending_erasure_request %}bg-amber-600 hover:bg-amber-700{% else %}bg-rose-600 hover:bg-rose-700{% endif %}"
+                            >
+                              Delete
+                            </button>
+                          </form>
+                        {% else %}
+                          <span class="inline-flex items-center rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-500">Current user</span>
+                        {% endif %}
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="mt-4 text-sm text-gray-500">No users found.</p>
+        {% endif %}
+      </section>
+    {% elif active_view == "servers" %}
+      <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-4">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Servers</h2>
+            <p class="mt-1 text-sm text-gray-500">Manage registered servers and remove server records.</p>
+          </div>
+          <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
+            {{ servers|length }} servers
+          </span>
         </div>
-      {% else %}
-        <p class="mt-4 text-sm text-gray-500">No pending access requests.</p>
-      {% endif %}
-    </section>
+        {% if servers %}
+          <div class="mt-4 overflow-x-auto rounded-xl border border-gray-200">
+            <table class="min-w-full divide-y divide-gray-200 text-sm" data-sort-table>
+              <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="text">Server <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="text">Hostname / IP <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="date">Agent enrolled <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="date">Last heartbeat <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 text-gray-700">
+                {% for server in servers %}
+                  <tr>
+                    <td class="px-3 py-2" data-sort-value="{{ server.display_name|lower }}">
+                      <a href="{% url 'servers:server_admin' server.id %}" class="font-medium text-blue-700 hover:underline">{{ server.display_name }}</a>
+                    </td>
+                    <td class="px-3 py-2" data-sort-value="{{ server.hostname|default:server.ipv4|default:server.ipv6|default:'unassigned'|lower }}">{{ server.hostname|default:server.ipv4|default:server.ipv6|default:"Unassigned" }}</td>
+                    <td class="px-3 py-2" data-sort-value="{% if server.agent_enrolled_at %}{{ server.agent_enrolled_at|date:'YmdHis' }}{% else %}0{% endif %}">
+                      {% if server.agent_enrolled_at %}
+                        {{ server.agent_enrolled_at|date:"M j, Y H:i" }}
+                      {% else %}
+                        <span class="text-gray-500">Not enrolled</span>
+                      {% endif %}
+                    </td>
+                    <td class="px-3 py-2" data-sort-value="{% if server.last_heartbeat_at %}{{ server.last_heartbeat_at|date:'YmdHis' }}{% else %}0{% endif %}">
+                      {% if server.last_heartbeat_at %}
+                        {{ server.last_heartbeat_at|date:"M j, Y H:i" }}
+                      {% else %}
+                        <span class="text-gray-500">Never</span>
+                      {% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                      <form method="post" action="{% url 'servers:admin_delete_server' server.id %}" onsubmit="return window.confirm('Delete server {{ server.display_name|escapejs }} and related records?');" class="inline-flex">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="inline-flex items-center rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">Delete</button>
+                      </form>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="mt-4 text-sm text-gray-500">No servers available.</p>
+        {% endif %}
+      </section>
+    {% elif active_view == "grants" %}
+      <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 pb-4">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Active grants</h2>
+            <p class="mt-1 text-sm text-gray-500">Review active grants, revoke access, and update expiry.</p>
+          </div>
+          <form method="get" action="{% url 'servers:admin_dashboard' %}" class="flex items-center gap-2">
+            <input type="hidden" name="view" value="grants">
+            <label for="grant-user-filter" class="text-xs font-semibold uppercase tracking-wide text-gray-500">Filter by user</label>
+            <select id="grant-user-filter" name="grant_user" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700">
+              <option value="">All users</option>
+              {% for user in grant_filter_users %}
+                <option value="{{ user.id }}" {% if grant_user_filter_id == user.id %}selected{% endif %}>{{ user.username }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800">Apply</button>
+          </form>
+        </div>
+        {% if selected_grant_user %}
+          <p class="mt-3 text-xs text-gray-500">Filtered for user: <span class="font-semibold text-gray-700">{{ selected_grant_user.username }}</span></p>
+        {% endif %}
+        {% if grant_rows %}
+          <div class="mt-4 overflow-x-auto rounded-xl border border-gray-200">
+            <table class="min-w-full divide-y divide-gray-200 text-sm" data-sort-table>
+              <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="text">User <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="text">Server <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="date">Last use <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="date">Expiry <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 text-gray-700">
+                {% for row in grant_rows %}
+                  <tr class="{% if row.expires_soon %}bg-amber-50{% endif %}">
+                    <td class="px-3 py-2" data-sort-value="{{ row.grant.requester.username|lower }}">{{ row.grant.requester.username }}</td>
+                    <td class="px-3 py-2" data-sort-value="{{ row.grant.server.display_name|lower }}">{{ row.grant.server.display_name }}</td>
+                    <td class="px-3 py-2" data-sort-value="{% if row.last_used_at %}{{ row.last_used_at|date:'YmdHis' }}{% else %}0{% endif %}">
+                      {% if row.last_used_at %}
+                        {{ row.last_used_at|date:"M j, Y H:i" }}
+                      {% else %}
+                        <span class="text-gray-500">No activity</span>
+                      {% endif %}
+                    </td>
+                    <td class="px-3 py-2" data-sort-value="{% if row.grant.expires_at %}{{ row.grant.expires_at|date:'YmdHis' }}{% else %}99999999999999{% endif %}">
+                      {% if row.grant.expires_at %}
+                        {{ row.grant.expires_at|date:"M j, Y H:i" }}
+                      {% else %}
+                        <span class="text-gray-500">No expiry</span>
+                      {% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                      <div class="inline-flex flex-wrap items-center justify-end gap-2">
+                        <form method="post" action="{% url 'servers:admin_revoke_grant' row.grant.id %}" onsubmit="return window.confirm('Revoke grant for {{ row.grant.requester.username|escapejs }} on {{ row.grant.server.display_name|escapejs }}?');">
+                          {% csrf_token %}
+                          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                          <button type="submit" class="inline-flex items-center rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">Revoke</button>
+                        </form>
+                        <form method="post" action="{% url 'servers:admin_change_grant_expiry' row.grant.id %}" class="inline-flex items-center gap-2">
+                          {% csrf_token %}
+                          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                          <input
+                            type="datetime-local"
+                            name="expires_at"
+                            value="{{ row.expires_at_input }}"
+                            class="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700"
+                          >
+                          <button type="submit" class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800">Change expiry</button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="mt-4 text-sm text-gray-500">No active grants available for this filter.</p>
+        {% endif %}
+      </section>
+    {% else %}
+      <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-4">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Access request queue</h2>
+            <p class="mt-1 text-sm text-gray-500">Review and decide pending access requests.</p>
+          </div>
+          <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+            {{ pending_access_requests|length }} pending
+          </span>
+        </div>
+        {% if pending_access_requests %}
+          <div class="mt-4 overflow-x-auto rounded-xl border border-gray-200">
+            <table class="min-w-full divide-y divide-gray-200 text-sm" data-sort-table>
+              <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="text">Requester <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="text">Server <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="number">Requested scopes <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold" data-sortable="true" data-sort-type="date">Requested at <span class="ml-1" data-sort-indicator></span></th>
+                  <th class="px-3 py-2 font-semibold text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 text-gray-700">
+                {% for row in pending_access_requests %}
+                  <tr>
+                    <td class="px-3 py-2" data-sort-value="{{ row.request.requester.username|lower }}">{{ row.request.requester.username }}</td>
+                    <td class="px-3 py-2" data-sort-value="{{ row.request.server.display_name|lower }}">
+                      <a href="{% url 'servers:server_admin' row.request.server.id %}" class="font-medium text-blue-700 hover:underline">
+                        {{ row.request.server.display_name }}
+                      </a>
+                    </td>
+                    <td class="px-3 py-2" data-sort-value="{{ row.scope_count }}">
+                      <div class="flex flex-wrap gap-1">
+                        {% if row.request.request_shell %}<span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Shell</span>{% endif %}
+                        {% if row.request.request_logs %}<span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Logs</span>{% endif %}
+                        {% if row.request.request_users %}<span class="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Users</span>{% endif %}
+                        {% if row.request.requested_duration_hours %}<span class="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">{{ row.request.requested_duration_hours }}h</span>{% endif %}
+                        {% if row.request.requested_server_username %}<span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">@{{ row.request.requested_server_username }}</span>{% endif %}
+                      </div>
+                    </td>
+                    <td class="px-3 py-2" data-sort-value="{{ row.request.requested_at|date:'YmdHis' }}">{{ row.request.requested_at|date:"M j, Y H:i" }}</td>
+                    <td class="px-3 py-2 text-right">
+                      <div class="inline-flex gap-2">
+                        <form method="post" action="{% url 'servers:decide_access_request' row.request.id %}">
+                          {% csrf_token %}
+                          <input type="hidden" name="action" value="approve">
+                          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                          <button type="submit" class="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Approve</button>
+                        </form>
+                        <form method="post" action="{% url 'servers:decide_access_request' row.request.id %}">
+                          {% csrf_token %}
+                          <input type="hidden" name="action" value="deny">
+                          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                          <button type="submit" class="inline-flex items-center rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">Deny</button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="mt-4 text-sm text-gray-500">No pending access requests.</p>
+        {% endif %}
+      </section>
+    {% endif %}
 
     <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
       <div class="border-b border-gray-100 pb-4">
@@ -109,40 +348,86 @@
         {% endfor %}
       </div>
     </section>
-
-    <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div class="border-b border-gray-100 pb-4">
-        <h2 class="text-lg font-semibold text-gray-900">Server admin pages</h2>
-        <p class="mt-1 text-sm text-gray-500">Open per-server administrative controls and user/account views.</p>
-      </div>
-      {% if servers %}
-        <div class="mt-4 overflow-x-auto rounded-xl border border-gray-200">
-          <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th class="px-3 py-2 font-semibold">Server</th>
-                <th class="px-3 py-2 font-semibold">Hostname / IP</th>
-                <th class="px-3 py-2 font-semibold text-right">Admin</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 text-gray-700">
-              {% for server in servers %}
-                <tr>
-                  <td class="px-3 py-2">{{ server.display_name }}</td>
-                  <td class="px-3 py-2">{{ server.hostname|default:server.ipv4|default:server.ipv6|default:"Unassigned" }}</td>
-                  <td class="px-3 py-2 text-right">
-                    <a href="{% url 'servers:server_admin' server.id %}" class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800">
-                      Open admin
-                    </a>
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        <p class="mt-4 text-sm text-gray-500">No servers available.</p>
-      {% endif %}
-    </section>
   </div>
+
+  <script>
+    (function () {
+      var tables = document.querySelectorAll("[data-sort-table]");
+
+      function getCellValue(row, index) {
+        var cell = row.children[index];
+        if (!cell) {
+          return "";
+        }
+        var explicit = cell.getAttribute("data-sort-value");
+        if (explicit !== null) {
+          return explicit;
+        }
+        return (cell.textContent || "").trim();
+      }
+
+      function parseValue(value, type) {
+        if (type === "number") {
+          var n = Number(value);
+          return Number.isNaN(n) ? 0 : n;
+        }
+        if (type === "date") {
+          var d = Number(value);
+          return Number.isNaN(d) ? 0 : d;
+        }
+        return String(value || "").toLowerCase();
+      }
+
+      tables.forEach(function (table) {
+        var body = table.querySelector("tbody");
+        if (!body) {
+          return;
+        }
+        var headers = Array.prototype.slice.call(table.querySelectorAll("th[data-sortable='true']"));
+        headers.forEach(function (header) {
+          header.classList.add("cursor-pointer", "select-none");
+          header.dataset.sortDirection = "none";
+          header.addEventListener("click", function () {
+            var allHeaderCells = Array.prototype.slice.call(header.parentElement.children);
+            var columnIndex = allHeaderCells.indexOf(header);
+            if (columnIndex < 0) {
+              return;
+            }
+            var direction = header.dataset.sortDirection === "asc" ? "desc" : "asc";
+            headers.forEach(function (th) {
+              if (th !== header) {
+                th.dataset.sortDirection = "none";
+                var indicator = th.querySelector("[data-sort-indicator]");
+                if (indicator) {
+                  indicator.textContent = "";
+                }
+              }
+            });
+            header.dataset.sortDirection = direction;
+            var headerIndicator = header.querySelector("[data-sort-indicator]");
+            if (headerIndicator) {
+              headerIndicator.textContent = direction === "asc" ? "▲" : "▼";
+            }
+
+            var rows = Array.prototype.slice.call(body.querySelectorAll("tr"));
+            var sortType = header.getAttribute("data-sort-type") || "text";
+            rows.sort(function (a, b) {
+              var aVal = parseValue(getCellValue(a, columnIndex), sortType);
+              var bVal = parseValue(getCellValue(b, columnIndex), sortType);
+              if (aVal < bVal) {
+                return direction === "asc" ? -1 : 1;
+              }
+              if (aVal > bVal) {
+                return direction === "asc" ? 1 : -1;
+              }
+              return 0;
+            });
+            rows.forEach(function (row) {
+              body.appendChild(row);
+            });
+          });
+        });
+      });
+    })();
+  </script>
 {% endblock %}

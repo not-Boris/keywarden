@@ -1,0 +1,43 @@
+erDiagram
+  USER ||--o{ SSHKEY : owns
+  SSHKEY ||--o| SSHCERTIFICATE : has_active_cert
+
+  USER ||--o{ ACCESSREQUEST : submits
+  SERVER ||--o{ ACCESSREQUEST : targets
+
+  SERVER ||--o{ SERVERACCOUNT : tracks
+  USER ||--o{ SERVERACCOUNT : maps_to_system_user
+
+  SERVER ||--o{ SERVERAUDITLOG : receives
+  SERVER ||--o{ SERVERLOGSOURCE : configures
+  SERVER ||--o{ TELEMETRYEVENT : emits
+  USER ||--o{ AUDITLOG : actor
+
+  SSHCERTIFICATEAUTHORITY ||--o{ SSHCERTIFICATE : signs
+  AGENTCERTIFICATEAUTHORITY ||--o{ SERVER : enrolls
+  SERVER ||--o{ ENROLLMENTTOKEN : bootstraps
+
+  USER {
+    int id PK
+    string email
+    bool is_active
+  }
+  SERVER {
+    int id PK
+    string display_name
+    string hostname
+    datetime last_heartbeat_at
+  }
+  ACCESSREQUEST {
+    int id PK
+    string status
+    bool request_shell
+    bool request_logs
+    bool request_users
+    datetime expires_at
+  }
+  SSHKEY {
+    int id PK
+    string fingerprint
+    bool is_active
+  }

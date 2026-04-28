@@ -31,6 +31,8 @@ class AccessRequest(models.Model):
     request_shell = models.BooleanField(default=False)
     request_logs = models.BooleanField(default=False)
     request_users = models.BooleanField(default=False)
+    requested_duration_hours = models.PositiveIntegerField(null=True, blank=True)
+    requested_server_username = models.CharField(max_length=128, blank=True)
     requested_at = models.DateTimeField(default=timezone.now, editable=False)
     decided_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)

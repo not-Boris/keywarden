@@ -1,0 +1,14 @@
+stateDiagram-v2
+  [*] --> Pending: request created
+
+  Pending --> Approved: admin approve
+  Pending --> Denied: admin deny
+  Pending --> Cancelled: requester cancel
+
+  Approved --> Revoked: admin revoke
+  Approved --> Expired: expires_at reached
+
+  Denied --> [*]
+  Cancelled --> [*]
+  Revoked --> [*]
+  Expired --> [*]

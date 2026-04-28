@@ -1,0 +1,37 @@
+flowchart TB
+  subgraph Z0[Public Network]
+    B[Browsers]
+    AG[Agents]
+  end
+
+  subgraph Z1[Edge]
+    T[Traefik]
+  end
+
+  subgraph Z2[Keywarden Host]
+    N[Nginx]
+    G[Gunicorn Django]
+    D[Daphne Channels]
+    C[Celery Worker + Beat]
+    P[(PostgreSQL)]
+    V[(Redis/Valkey)]
+    K[(CA Key Files)]
+  end
+
+  subgraph Z3[Managed Hosts]
+    SSH[sshd + local accounts]
+  end
+
+  B -->|HTTPS 443| T
+  AG -->|HTTPS 443| T
+  T -->|HTTPS 443| N
+  N -->|HTTP 8000| G
+  N -->|WS 8001| D
+  G --> P
+  G --> V
+  C --> P
+  C --> V
+  G --> K
+  AG --> SSH
+
+  AG -.mTLS cert presented on /api/v1/agent/.-> N

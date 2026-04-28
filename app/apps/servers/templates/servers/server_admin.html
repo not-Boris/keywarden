@@ -68,6 +68,8 @@
                       {% if req.request_shell %}<span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Shell</span>{% endif %}
                       {% if req.request_logs %}<span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Logs</span>{% endif %}
                       {% if req.request_users %}<span class="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Users</span>{% endif %}
+                      {% if req.requested_duration_hours %}<span class="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">{{ req.requested_duration_hours }}h</span>{% endif %}
+                      {% if req.requested_server_username %}<span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">@{{ req.requested_server_username }}</span>{% endif %}
                     </div>
                   </td>
                   <td class="px-3 py-2">{{ req.requested_at|date:"M j, Y H:i" }}</td>

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from django.http import HttpRequest
@@ -22,6 +22,8 @@ class AccessRequestCreateIn(Schema):
     request_shell: bool = False
     request_logs: bool = False
     request_users: bool = False
+    requested_duration_hours: Optional[int] = Field(default=None, ge=1, le=168)
+    requested_server_username: Optional[str] = None
     expires_at: Optional[datetime] = None
 
 
@@ -39,6 +41,8 @@ class AccessRequestOut(Schema):
     request_shell: bool
     request_logs: bool
     request_users: bool
+    requested_duration_hours: Optional[int] = None
+    requested_server_username: str
     requested_at: str
     decided_at: Optional[str] = None
     expires_at: Optional[str] = None
@@ -63,6 +67,8 @@ def _request_to_out(access_request: AccessRequest) -> AccessRequestOut:
         request_shell=access_request.request_shell,
         request_logs=access_request.request_logs,
         request_users=access_request.request_users,
+        requested_duration_hours=access_request.requested_duration_hours,
+        requested_server_username=access_request.requested_server_username or "",
         requested_at=access_request.requested_at.isoformat(),
         decided_at=access_request.decided_at.isoformat() if access_request.decided_at else None,
         expires_at=access_request.expires_at.isoformat() if access_request.expires_at else None,
@@ -140,6 +146,8 @@ def build_router() -> Router:
             request_shell=payload.request_shell,
             request_logs=payload.request_logs,
             request_users=payload.request_users,
+            requested_duration_hours=payload.requested_duration_hours,
+            requested_server_username=(payload.requested_server_username or "").strip()[:128],
         )
         if payload.expires_at:
             access_request.expires_at = payload.expires_at
@@ -216,6 +224,15 @@ def build_router() -> Router:
                 access_request.decided_by = request.user
             else:
                 access_request.decided_by = None
+            if (
+                is_admin
+                and status == AccessRequest.Status.APPROVED
+                and access_request.requested_duration_hours
+                and not access_request.expires_at
+            ):
+                access_request.expires_at = access_request.decided_at + timedelta(
+                    hours=access_request.requested_duration_hours
+                )
         access_request.save()
         sync_server_view_perm(access_request)
         return _request_to_out(access_request)

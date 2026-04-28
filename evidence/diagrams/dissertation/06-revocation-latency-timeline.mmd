@@ -1,0 +1,19 @@
+sequenceDiagram
+  participant AD as Administrator
+  participant K as Keywarden
+  participant AG as Agent
+  participant H as Managed Host
+  participant U as User
+
+  AD->>K: Revoke access at t0
+  Note right of K: Policy state changes immediately
+
+  loop Poll interval = N seconds
+    AG->>K: Poll /accounts + /ssh-ca
+  end
+
+  K-->>AG: Revoked state at t0 + delta
+  AG->>H: Remove/lock account and apply new state
+  H-->>U: SSH denied
+
+  Note over AD,U: Effective revocation latency <= poll interval + agent apply time

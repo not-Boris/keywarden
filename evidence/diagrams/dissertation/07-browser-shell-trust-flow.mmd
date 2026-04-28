@@ -1,0 +1,23 @@
+sequenceDiagram
+  participant U as Browser User
+  participant UI as Shell UI
+  participant SC as ShellConsumer
+  participant CA as User SSH CA
+  participant H as Target sshd
+
+  U->>UI: Open /servers/{id}/shell
+  UI->>SC: Open WebSocket /ws/servers/{id}/shell
+  SC->>SC: Authenticate session + object permission check
+
+  SC->>SC: Generate ephemeral keypair (tmp dir)
+  SC->>CA: Sign ephemeral public key (short TTL)
+  CA-->>SC: SSH certificate
+
+  SC->>H: Start ssh -tt with key + cert
+  U<->>SC: Terminal I/O over WebSocket
+  SC<->>H: SSH stream
+
+  U->>SC: Disconnect/close tab
+  SC->>SC: Terminate process and clean temp key material
+
+  Note over U,H: Feature is beta; session transcript retention is limited

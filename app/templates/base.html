@@ -1,4 +1,4 @@
-{% load static tailwind_tags %}
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -9,12 +9,11 @@
     <link rel="icon" type="image/svg+xml" href="{% static 'branding/keywarden-favicon.svg' %}">
     <link rel="icon" type="image/png" href="{% static 'ninja/favicon.png' %}">
     <meta id="kw-theme-color" name="theme-color" content="#0f172a">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <meta property="og:title" content="Keywarden">
     <meta name="twitter:card" content="summary">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    {% tailwind_css %}
+    <link rel="stylesheet" href="{% static 'css/fonts-space-grotesk.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
     <style>
       :root {
         color-scheme: light;
@@ -172,6 +171,9 @@
       }
       html[data-theme="dark"] .bg-amber-100 {
         background-color: rgba(180, 83, 9, 0.35) !important;
+      }
+      html[data-theme="dark"] .bg-amber-50 {
+        background-color: rgba(180, 83, 9, 0.22) !important;
       }
       html[data-theme="dark"] .bg-red-50 {
         background-color: rgba(127, 29, 29, 0.32) !important;
@@ -376,6 +378,21 @@
     </div>
     <script>
       (function () {
+        window.keywardenGetCsrfToken = function () {
+          var meta = document.querySelector('meta[name="csrf-token"]');
+          if (meta && meta.content && meta.content !== "NOTPROVIDED") {
+            return meta.content;
+          }
+          var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+          if (input && input.value) {
+            return input.value;
+          }
+          return "";
+        };
+      })();
+    </script>
+    <script>
+      (function () {
         var key = "keywardenThemeMode";
         var root = document.documentElement;
         var toggles = document.querySelectorAll("[data-theme-toggle]");
@@ -496,6 +513,53 @@
         window.keywardenSetDisplayMode = setMode;
       })();
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/flowbite@4.0.1/dist/flowbite.min.js"></script>
+    <script>
+      (function () {
+        var collapseToggles = document.querySelectorAll("[data-collapse-toggle]");
+        for (var i = 0; i < collapseToggles.length; i += 1) {
+          collapseToggles[i].addEventListener("click", function (event) {
+            var button = event.currentTarget;
+            var targetId = button.getAttribute("data-collapse-toggle");
+            if (!targetId) {
+              return;
+            }
+            var target = document.getElementById(targetId);
+            if (!target) {
+              return;
+            }
+            var isHidden = target.classList.contains("hidden");
+            target.classList.toggle("hidden", !isHidden);
+            button.setAttribute("aria-expanded", isHidden ? "true" : "false");
+          });
+        }
+
+        function setTooltipState(tooltip, show) {
+          if (!tooltip) {
+            return;
+          }
+          tooltip.classList.toggle("invisible", !show);
+          tooltip.classList.toggle("opacity-0", !show);
+          tooltip.classList.toggle("opacity-100", show);
+        }
+
+        var tooltipTriggers = document.querySelectorAll("[data-tooltip-target]");
+        for (var j = 0; j < tooltipTriggers.length; j += 1) {
+          (function (trigger) {
+            var tooltipId = trigger.getAttribute("data-tooltip-target");
+            if (!tooltipId) {
+              return;
+            }
+            var tooltip = document.getElementById(tooltipId);
+            if (!tooltip) {
+              return;
+            }
+            trigger.addEventListener("mouseenter", function () { setTooltipState(tooltip, true); });
+            trigger.addEventListener("mouseleave", function () { setTooltipState(tooltip, false); });
+            trigger.addEventListener("focus", function () { setTooltipState(tooltip, true); });
+            trigger.addEventListener("blur", function () { setTooltipState(tooltip, false); });
+          })(tooltipTriggers[j]);
+        }
+      })();
+    </script>
   </body>
 </html>

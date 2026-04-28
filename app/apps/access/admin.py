@@ -25,6 +25,8 @@ class AccessRequestAdmin(GuardedModelAdmin):
         "request_shell",
         "request_logs",
         "request_users",
+        "requested_duration_hours",
+        "requested_server_username",
         "requested_at",
         "expires_at",
         "decided_by",
@@ -56,6 +58,8 @@ class AccessRequestAdmin(GuardedModelAdmin):
                             "request_shell",
                             "request_logs",
                             "request_users",
+                            "requested_duration_hours",
+                            "requested_server_username",
                             "expires_at",
                         )
                     },
@@ -73,6 +77,8 @@ class AccessRequestAdmin(GuardedModelAdmin):
                         "request_shell",
                         "request_logs",
                         "request_users",
+                        "requested_duration_hours",
+                        "requested_server_username",
                         "expires_at",
                     )
                 },

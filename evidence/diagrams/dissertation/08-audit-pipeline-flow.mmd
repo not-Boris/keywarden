@@ -1,0 +1,21 @@
+flowchart LR
+  subgraph S[Event Sources]
+    API[API Requests]
+    WS[WebSocket Shell Events]
+    AL[Agent Log Batches]
+    HB[Agent Heartbeat/Sync Reports]
+  end
+
+  API --> MM[Audit Matcher + Event Type Rules]
+  WS --> MM
+  MM --> AL1[(AuditLog)]
+
+  AL --> N1[Normalize + Parse]
+  N1 --> AL2[(ServerAuditLog)]
+
+  HB --> T1[(TelemetryEvent)]
+
+  AL1 --> UI[Admin Audit Views]
+  AL2 --> UI
+  T1 --> UI
+  UI --> EV[Evidence Export: logs, CSV, summaries]

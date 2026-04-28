@@ -1,0 +1,27 @@
+sequenceDiagram
+  participant AD as Administrator
+  participant AG as Agent
+  participant K as Keywarden API
+  participant N as Nginx
+
+  AD->>K: Create one-time enrollment token
+  AG->>AG: Generate keypair + CSR
+  AG->>K: POST /agent/enroll (token + CSR + host/IP)
+  K->>K: Validate token, create/update Server, sign client cert
+  K-->>AG: server_id + client_cert + ca_cert (+ token metadata)
+  AG->>AG: Persist cert/key/ca and server_id
+
+  loop Runtime polling
+    AG->>N: /api/v1/agent/* with client cert
+    N->>K: Forward request + TLS client headers
+    K->>K: Validate mTLS cert fingerprint/serial against server
+    K-->>AG: 200 + policy/state payload
+  end
+
+  alt mTLS context missing and fallback enabled
+    AG->>K: Authorization: Bearer <agent token>
+    K->>K: Validate server/global token
+    K-->>AG: 200 (compatibility mode)
+  else mTLS strict mode
+    K-->>AG: 401 Unauthorized
+  end

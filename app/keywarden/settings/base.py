@@ -82,6 +82,8 @@ KEYWARDEN_SOCIAL_AUTH_ENABLED = (
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_HTTPONLY = True
 
 INSTALLED_APPS = [
     "unfold.contrib.guardian",
@@ -238,6 +240,8 @@ PASSWORD_HASHERS = [
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR/"static"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# Avoid wildcard CORS on static assets (Access-Control-Allow-Origin: *).
+WHITENOISE_ALLOW_ALL_ORIGINS = False
 
 TAILWIND_APP_NAME="theme"
 

@@ -1,0 +1,27 @@
+sequenceDiagram
+  participant U as User
+  participant K as Keywarden
+  participant AD as Administrator
+  participant AG as Agent
+  participant H as Managed Host
+
+  U->>K: Submit access request (shell/logs/users)
+  K-->>U: Request status = pending
+  AD->>K: Approve request
+  K-->>AD: Grant active
+
+  loop Poll every N seconds
+    AG->>K: Fetch accounts + CA + log policy
+    K-->>AG: Effective access state
+  end
+
+  AG->>H: Create/lock accounts + apply trust config
+  AG->>K: Sync report + heartbeat + logs
+  K-->>AD: Updated admin/audit view
+
+  AD->>K: Revoke or let request expire
+  loop Next poll
+    AG->>K: Pull updated state
+    K-->>AG: User removed/expired
+  end
+  AG->>H: Enforce revocation

@@ -1,0 +1,38 @@
+flowchart LR
+  ATT[External Attacker]
+
+  subgraph Z0[Untrusted Network]
+    U[User/Admin Browsers]
+    AG[Agents]
+  end
+
+  subgraph Z1[Edge Trust Boundary]
+    T[Traefik]
+  end
+
+  subgraph Z2[Keywarden Trusted Zone]
+    N[Nginx]
+    APP[Keywarden App]
+    DB[(PostgreSQL)]
+    R[(Redis/Valkey)]
+    CA[(CA Private Keys)]
+  end
+
+  subgraph Z3[Managed Host Zone]
+    SSH[sshd + local accounts]
+  end
+
+  U -->|HTTPS| T -->|HTTPS| N --> APP
+  AG -->|HTTPS/mTLS path| T
+  AG --> SSH
+  APP --> DB
+  APP --> R
+  APP --> CA
+
+  ATT -.credential theft / token misuse.-> T
+  ATT -.injection / auth bypass attempts.-> APP
+  ATT -.MITM if proxy TLS/mTLS misconfigured.-> N
+  ATT -.host compromise impact.-> SSH
+
+  Note1[Key Risk: CA private keys are central high-value assets]
+  CA --- Note1

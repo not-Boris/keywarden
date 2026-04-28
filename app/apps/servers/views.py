@@ -20,6 +20,8 @@ from guardian.shortcuts import get_objects_for_user, get_users_with_perms
 
 from apps.access.models import AccessRequest
 from apps.access.permissions import sync_server_view_perm
+from apps.accounts.forms import NativePasswordResetForm
+from apps.accounts.models import ErasureRequest
 from apps.keys.utils import render_system_username
 from apps.keys.models import SSHKey
 from apps.servers.models import Server, ServerAccount, ServerAuditLog
@@ -31,6 +33,7 @@ AUDIT_SUBPAGE_OPTIONS = {"charts", "logs"}
 SSH_LOGIN_EVENT_TYPES = ("ssh.login.success", "ssh.login.fail")
 HTTP_STATUS_PATTERN = re.compile(r'"\s*(\d{3})\s+\S+')
 LOGIN_OUTCOME_OPTIONS = {"attempts", "success", "failed"}
+REQUEST_DURATION_HOURS_OPTIONS = (1, 4, 8, 24, 72, 168)
 
 
 def _is_admin_user(user) -> bool:
@@ -168,20 +171,122 @@ def dashboard(request):
 def admin_dashboard(request):
     _require_admin_or_404(request)
     now = timezone.now()
+    active_view = (request.GET.get("view") or "pending").strip().lower()
+    if active_view not in {"users", "servers", "pending", "grants"}:
+        active_view = "pending"
+
     pending_access_requests = list(
         AccessRequest.objects.select_related("requester", "server")
         .filter(status=AccessRequest.Status.PENDING)
         .order_by("requested_at")
     )
-    total_users = get_user_model().objects.count()
-    total_servers = Server.objects.count()
-    open_access_requests = AccessRequest.objects.filter(status=AccessRequest.Status.PENDING).count()
-    active_access_grants = (
-        AccessRequest.objects.filter(status=AccessRequest.Status.APPROVED)
+    pending_access_request_rows = [
+        {
+            "request": pending_access_request,
+            "scope_count": int(bool(pending_access_request.request_shell))
+            + int(bool(pending_access_request.request_logs))
+            + int(bool(pending_access_request.request_users)),
+        }
+        for pending_access_request in pending_access_requests
+    ]
+    active_grants_qs = (
+        AccessRequest.objects.select_related("requester", "server")
+        .filter(status=AccessRequest.Status.APPROVED)
         .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
         .filter(Q(request_shell=True) | Q(request_logs=True) | Q(request_users=True))
-        .count()
+        .order_by("requester__username", "server__display_name", "requested_at", "id")
     )
+    active_grants = list(active_grants_qs)
+
+    grant_servers_by_user_id: dict[int, set[str]] = {}
+    grant_counts_by_user_id: dict[int, int] = {}
+    for grant in active_grants:
+        grant_counts_by_user_id[grant.requester_id] = grant_counts_by_user_id.get(grant.requester_id, 0) + 1
+        grant_servers_by_user_id.setdefault(grant.requester_id, set()).add(grant.server.display_name)
+
+    users = list(get_user_model().objects.order_by("username", "id"))
+    pending_erasure_user_ids = set(
+        ErasureRequest.objects.filter(status=ErasureRequest.Status.PENDING).values_list("user_id", flat=True)
+    )
+    user_rows = []
+    for user in users:
+        user_servers = sorted(grant_servers_by_user_id.get(user.id, set()), key=lambda value: value.lower())
+        user_rows.append(
+            {
+                "user": user,
+                "active_grants_count": grant_counts_by_user_id.get(user.id, 0),
+                "active_grant_servers": user_servers,
+                "active_grants_tooltip": ", ".join(user_servers) if user_servers else "No active grants",
+                "has_pending_erasure_request": user.id in pending_erasure_user_ids,
+            }
+        )
+
+    servers = list(Server.objects.order_by("display_name", "hostname", "id"))
+
+    grant_user_filter_raw = (request.GET.get("grant_user") or "").strip()
+    grant_user_filter_id = None
+    try:
+        if grant_user_filter_raw:
+            grant_user_filter_id = int(grant_user_filter_raw)
+    except (TypeError, ValueError):
+        grant_user_filter_id = None
+
+    grants_for_view = active_grants
+    if grant_user_filter_id is not None:
+        grants_for_view = [grant for grant in grants_for_view if grant.requester_id == grant_user_filter_id]
+
+    last_used_lookup: dict[tuple[int, str], datetime] = {}
+    if grants_for_view:
+        grant_server_ids = {grant.server_id for grant in grants_for_view}
+        grant_usernames = {grant.requester.username for grant in grants_for_view if grant.requester.username}
+        if grant_server_ids and grant_usernames:
+            audit_rows = (
+                ServerAuditLog.objects.filter(server_id__in=grant_server_ids, username__in=grant_usernames)
+                .exclude(username="")
+                .values("server_id", "username", "event_at")
+                .order_by("server_id", "username", "-event_at")
+            )
+            for audit_row in audit_rows:
+                key = (audit_row["server_id"], audit_row["username"])
+                if key in last_used_lookup:
+                    continue
+                last_used_lookup[key] = audit_row["event_at"]
+
+    grant_rows = []
+    for grant in grants_for_view:
+        last_used_at = last_used_lookup.get((grant.server_id, grant.requester.username))
+        expires_soon = False
+        if grant.expires_at is not None:
+            remaining = grant.expires_at - now
+            expires_soon = timedelta(0) <= remaining <= timedelta(days=7)
+        expires_at_input = ""
+        if grant.expires_at is not None:
+            expires_at_local = timezone.localtime(grant.expires_at, timezone.get_current_timezone())
+            expires_at_input = expires_at_local.strftime("%Y-%m-%dT%H:%M")
+        grant_rows.append(
+            {
+                "grant": grant,
+                "last_used_at": last_used_at,
+                "expires_soon": expires_soon,
+                "expires_at_input": expires_at_input,
+            }
+        )
+
+    grant_filter_users_by_id = {grant.requester_id: grant.requester for grant in active_grants}
+    grant_filter_users = sorted(
+        grant_filter_users_by_id.values(),
+        key=lambda user: (user.username.lower(), user.id),
+    )
+    selected_grant_user = next(
+        (user for user in grant_filter_users if user.id == grant_user_filter_id),
+        None,
+    )
+
+    total_users = len(users)
+    total_servers = len(servers)
+    open_access_requests = len(pending_access_requests)
+    active_access_grants = len(active_grants)
+
     utilities = [
         {
             "title": "Server Inventory",
@@ -214,11 +319,16 @@ def admin_dashboard(request):
             "url": reverse("admin:index"),
         },
     ]
-    servers = list(Server.objects.order_by("display_name", "hostname", "id"))
     context = {
-        "pending_access_requests": pending_access_requests,
-        "utilities": utilities,
+        "active_view": active_view,
+        "pending_access_requests": pending_access_request_rows,
+        "users": user_rows,
         "servers": servers,
+        "grant_rows": grant_rows,
+        "grant_filter_users": grant_filter_users,
+        "selected_grant_user": selected_grant_user,
+        "grant_user_filter_id": grant_user_filter_id,
+        "utilities": utilities,
         "summary": {
             "users": total_users,
             "servers": total_servers,
@@ -247,13 +357,40 @@ def request_access(request, server_id: int):
         status=AccessRequest.Status.PENDING,
     ).exists():
         return redirect("servers:dashboard")
+    scoped_request = (request.POST.get("scoped_request") or "").strip() == "1"
+    if scoped_request:
+        request_shell = (request.POST.get("request_shell") or "").strip().lower() in {"1", "true", "on", "yes"}
+        request_logs = (request.POST.get("request_logs") or "").strip().lower() in {"1", "true", "on", "yes"}
+        request_users = (request.POST.get("request_users") or "").strip().lower() in {"1", "true", "on", "yes"}
+        if not any((request_shell, request_logs, request_users)):
+            return redirect("servers:dashboard")
+        reason = (request.POST.get("reason") or "").strip()
+        requested_server_username = (request.POST.get("requested_server_username") or "").strip()[:128]
+        requested_duration_hours = None
+        raw_duration = (request.POST.get("requested_duration_hours") or "").strip()
+        if raw_duration:
+            try:
+                parsed_duration = int(raw_duration)
+            except (TypeError, ValueError):
+                parsed_duration = None
+            if parsed_duration in REQUEST_DURATION_HOURS_OPTIONS:
+                requested_duration_hours = parsed_duration
+    else:
+        request_shell = True
+        request_logs = True
+        request_users = True
+        reason = ""
+        requested_server_username = ""
+        requested_duration_hours = None
     AccessRequest.objects.create(
         requester=request.user,
         server=server,
-        reason="",
-        request_shell=True,
-        request_logs=True,
-        request_users=True,
+        reason=reason,
+        request_shell=request_shell,
+        request_logs=request_logs,
+        request_users=request_users,
+        requested_duration_hours=requested_duration_hours,
+        requested_server_username=requested_server_username,
     )
     return redirect("servers:dashboard")
 
@@ -270,17 +407,108 @@ def decide_access_request(request, request_id: int):
     if access_request.status != AccessRequest.Status.PENDING:
         return redirect(_next_redirect_target(request, access_request.server_id))
     action = (request.POST.get("action") or "").strip().lower()
+    decision_at = timezone.now()
+    update_fields = ["status", "decided_at", "decided_by"]
     if action == "approve":
         access_request.status = AccessRequest.Status.APPROVED
+        if access_request.requested_duration_hours and not access_request.expires_at:
+            access_request.expires_at = decision_at + timedelta(hours=access_request.requested_duration_hours)
+            update_fields.append("expires_at")
     elif action == "deny":
         access_request.status = AccessRequest.Status.DENIED
     else:
         return redirect(_next_redirect_target(request, access_request.server_id))
-    access_request.decided_at = timezone.now()
+    access_request.decided_at = decision_at
     access_request.decided_by = request.user
-    access_request.save(update_fields=["status", "decided_at", "decided_by"])
+    access_request.save(update_fields=update_fields)
     sync_server_view_perm(access_request)
     return redirect(_next_redirect_target(request, access_request.server_id))
+
+
+@login_required(login_url="/accounts/login/")
+@require_POST
+def admin_send_password_reset(request, user_id: int):
+    _require_admin_or_404(request)
+    user_model = get_user_model()
+    try:
+        target_user = user_model.objects.get(id=user_id)
+    except user_model.DoesNotExist:
+        raise Http404("User not found")
+
+    reset_form = NativePasswordResetForm({"email": target_user.email})
+    if reset_form.is_valid():
+        reset_form.save(
+            request=request,
+            use_https=request.is_secure(),
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@localhost"),
+            email_template_name="accounts/password_reset_email.txt",
+            subject_template_name="accounts/password_reset_subject.txt",
+        )
+    return redirect(_admin_next_redirect_target(request))
+
+
+@login_required(login_url="/accounts/login/")
+@require_POST
+def admin_delete_user(request, user_id: int):
+    _require_admin_or_404(request)
+    user_model = get_user_model()
+    try:
+        target_user = user_model.objects.get(id=user_id)
+    except user_model.DoesNotExist:
+        raise Http404("User not found")
+    if target_user.id == request.user.id:
+        return redirect(_admin_next_redirect_target(request))
+    target_user.delete()
+    return redirect(_admin_next_redirect_target(request))
+
+
+@login_required(login_url="/accounts/login/")
+@require_POST
+def admin_delete_server(request, server_id: int):
+    _require_admin_or_404(request)
+    try:
+        server = Server.objects.get(id=server_id)
+    except Server.DoesNotExist:
+        raise Http404("Server not found")
+    server.delete()
+    return redirect(_admin_next_redirect_target(request))
+
+
+@login_required(login_url="/accounts/login/")
+@require_POST
+def admin_revoke_grant(request, grant_id: int):
+    _require_admin_or_404(request)
+    try:
+        grant = AccessRequest.objects.select_related("server", "requester").get(id=grant_id)
+    except AccessRequest.DoesNotExist:
+        raise Http404("Access grant not found")
+    if grant.status == AccessRequest.Status.APPROVED:
+        now = timezone.now()
+        grant.status = AccessRequest.Status.REVOKED
+        grant.decided_at = now
+        grant.decided_by = request.user
+        grant.expires_at = now
+        grant.save(update_fields=["status", "decided_at", "decided_by", "expires_at"])
+        sync_server_view_perm(grant)
+    return redirect(_admin_next_redirect_target(request))
+
+
+@login_required(login_url="/accounts/login/")
+@require_POST
+def admin_change_grant_expiry(request, grant_id: int):
+    _require_admin_or_404(request)
+    try:
+        grant = AccessRequest.objects.select_related("server", "requester").get(id=grant_id)
+    except AccessRequest.DoesNotExist:
+        raise Http404("Access grant not found")
+
+    raw_expires_at = (request.POST.get("expires_at") or "").strip()
+    expires_at = _parse_filter_datetime(raw_expires_at, end_of_day=True) if raw_expires_at else None
+    if grant.status == AccessRequest.Status.APPROVED:
+        grant.expires_at = expires_at
+        grant.save(update_fields=["expires_at"])
+        sync_server_view_perm(grant)
+    return redirect(_admin_next_redirect_target(request))
 
 
 @login_required(login_url="/accounts/login/")
@@ -1043,6 +1271,13 @@ def _parse_line_limit(raw_value) -> int:
     if parsed in AUDIT_LINE_LIMIT_OPTIONS:
         return parsed
     return DEFAULT_AUDIT_LINE_LIMIT
+
+
+def _admin_next_redirect_target(request) -> str:
+    target = (request.POST.get("next") or "").strip()
+    if target.startswith("/"):
+        return target
+    return reverse("servers:admin_dashboard")
 
 
 def _next_redirect_target(request, server_id: int) -> str:

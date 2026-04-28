@@ -1,0 +1,33 @@
+flowchart LR
+  U[User Browser]
+  A[Admin Browser]
+  I[OIDC IdP]
+
+  subgraph K[Keywarden Control Plane]
+    UI[Web UI + API]
+    WS[WebSocket Shell Service]
+    DB[(PostgreSQL)]
+    R[(Redis/Valkey)]
+    UCA[(User SSH CA)]
+    ACA[(Agent mTLS CA)]
+  end
+
+  subgraph M[Managed Infrastructure]
+    AG[Keywarden Agent]
+    H[Linux Host + sshd]
+  end
+
+  U --> UI
+  A --> UI
+  UI <--> I
+  UI --> DB
+  UI --> R
+  UI --> UCA
+  UI --> ACA
+
+  AG <--> UI
+  AG --> H
+  U --> H
+
+  U -.optional browser shell.-> WS
+  WS --> H
