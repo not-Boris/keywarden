@@ -9,7 +9,10 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=on
 
 WORKDIR /app
-
+RUN sed -i \
+-e 's|http://deb\.debian\.org/debian-security|http://security.debian.org/debian-security|g' \
+-e 's|http://deb\.debian\.org/debian|http://ftp.uk.debian.org/debian|g' \
+/etc/apt/sources.list.d/debian.sources
 # System deps for psycopg2, node (for Tailwind), etc.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \

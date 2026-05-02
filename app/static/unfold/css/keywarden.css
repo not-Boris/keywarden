@@ -97,3 +97,16 @@ html:not(.dark) .kw-pill {
   min-width: 0;
 }
 
+/* Emergency presentation fix: hide Unfold search UI everywhere in admin. */
+form[action$="/admin/search/"],
+form[action*="/admin/search/?"],
+a[href$="/admin/search/"],
+a[href*="/admin/search/?"] {
+  display: none !important;
+}
+
+/* Keep Unfold command modal from blocking admin login if Alpine state desyncs. */
+body.login #modal-overlay,
+body.login [x-show="openModal"] {
+  display: none !important;
+}

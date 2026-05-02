@@ -87,7 +87,10 @@ class ServerAdmin(GuardedModelAdmin):
         if not request.user.is_superuser:
             return super().get_deleted_objects(objs, request)
 
-        server_ids = list(objs.values_list("id", flat=True))
+        if hasattr(objs, "values_list"):
+            server_ids = list(objs.values_list("id", flat=True))
+        else:
+            server_ids = [obj.id for obj in objs if getattr(obj, "id", None) is not None]
         if not server_ids:
             return super().get_deleted_objects(objs, request)
 

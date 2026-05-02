@@ -76,6 +76,43 @@ class ServerAdminDeleteTests(TestCase):
         self.assertEqual(model_count[ServerLogSource._meta.verbose_name_plural], 1)
         self.assertEqual(model_count[AccessRequest._meta.verbose_name_plural], 1)
 
+    @override_settings(KEYWARDEN_ADMIN_DELETE_PREVIEW_MAX_ITEMS=2)
+    def test_get_deleted_objects_accepts_plain_object_list(self) -> None:
+        server = Server.objects.create(display_name="srv-admin-delete-list")
+        ServerAuditLog.objects.bulk_create(
+            [
+                ServerAuditLog(
+                    server=server,
+                    event_at=timezone.now(),
+                    category="auth",
+                    event_type="login",
+                ),
+                ServerAuditLog(
+                    server=server,
+                    event_at=timezone.now(),
+                    category="auth",
+                    event_type="logout",
+                ),
+                ServerAuditLog(
+                    server=server,
+                    event_at=timezone.now(),
+                    category="auth",
+                    event_type="sudo",
+                ),
+            ]
+        )
+
+        deleted_objects, model_count, perms_needed, protected = self.model_admin.get_deleted_objects(
+            [server],
+            self._request(),
+        )
+
+        self.assertEqual(perms_needed, set())
+        self.assertEqual(protected, [])
+        self.assertIn("Large cascade detected", " ".join(str(item) for item in deleted_objects))
+        self.assertEqual(model_count[Server._meta.verbose_name_plural], 1)
+        self.assertEqual(model_count[ServerAuditLog._meta.verbose_name_plural], 3)
+
     def test_delete_queryset_prepurges_audit_logs(self) -> None:
         server = Server.objects.create(display_name="srv-admin-delete-purge")
         ServerAuditLog.objects.bulk_create(

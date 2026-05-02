@@ -291,7 +291,8 @@ UNFOLD = {
     # Force a consistent admin theme; disables theme switching.
     "THEME": "dark", # Force theme: "dark" or "light". Will disable theme switcher
     "SIDEBAR": {
-        "show_search": True,
+        "show_search": False,
+        "command_search": False,
         "show_all_applications": True,
         "navigation": [
             {
@@ -310,7 +311,7 @@ UNFOLD = {
     "STYLES": [
         "/static/unfold/css/styles.css",
         "/static/unfold/css/simplebar.css",
-        #(lambda request: "/static/unfold/css/keywarden.css"),
+        "/static/unfold/css/keywarden.css",
     ],
     # "TABS": [
     #     {
